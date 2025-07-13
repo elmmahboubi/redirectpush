@@ -43,9 +43,7 @@ export default function RedirectPage() {
                 ip_address: null,
                 country: null,
                 country_code: null,
-                city: null,
-                is_proxy: null,
-                real_ip: null
+                city: null
               })
 
             if (referrerError) {
@@ -84,9 +82,7 @@ export default function RedirectPage() {
                 .update({
                   country: geoData.country,
                   country_code: geoData.country_code,
-                  city: geoData.city,
-                  is_proxy: geoData.isProxy || false,
-                  real_ip: geoData.realIP || null
+                  city: geoData.city
                 })
                 .eq('short_link_id', shortLink.id)
                 .eq('referrer', referrer)

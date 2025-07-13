@@ -449,7 +449,7 @@ export default function HomePage() {
                                   ? 'bg-purple-50 border-purple-300 text-purple-600'
                                   : 'hover:bg-purple-50 hover:border-purple-300'
                               }`}
-                              title="View analytics"
+                              title={expandedAnalytics.has(link.id) ? "Hide analytics" : "Show analytics"}
                             >
                               <BarChart3 className="h-4 w-4" />
                             </Button>

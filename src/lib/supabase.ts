@@ -35,8 +35,6 @@ export type ReferrerClick = {
   country: string | null
   country_code: string | null
   city: string | null
-  is_proxy: boolean | null
-  real_ip: string | null
   clicked_at: string
 }
 
