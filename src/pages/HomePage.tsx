@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe } from 'lucide-react'
+import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2 } from 'lucide-react'
 import { supabase, type ShortLink } from '@/lib/supabase'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
@@ -18,6 +18,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState<'created_at' | 'click_count'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null)
 
   // Add error logging
   console.log('HomePage component rendering...')
@@ -120,6 +121,35 @@ export default function HomePage() {
       toast.success('Copied to clipboard!')
     } catch (error) {
       toast.error('Failed to copy to clipboard')
+    }
+  }
+
+  const deleteShortLink = async (linkId: string, slug: string) => {
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete the link "${slug}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingLinkId(linkId)
+    
+    try {
+      // Delete the short link (this will cascade delete referrer_clicks due to foreign key)
+      const { error } = await supabase
+        .from('short_links')
+        .delete()
+        .eq('id', linkId)
+
+      if (error) throw error
+
+      toast.success('Link deleted successfully!')
+      
+      // Refresh the links list
+      await fetchShortLinks()
+    } catch (error) {
+      console.error('Error deleting link:', error)
+      toast.error('Failed to delete link')
+    } finally {
+      setDeletingLinkId(null)
     }
   }
 
@@ -456,6 +486,21 @@ export default function HomePage() {
                               title={expandedAnalytics.has(link.id) ? "Hide analytics" : "Show analytics"}
                             >
                               <BarChart3 className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteShortLink(link.id, link.slug)}
+                              disabled={deletingLinkId === link.id}
+                              className="h-9 w-9 p-0 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
+                              title="Delete link"
+                            >
+                              {deletingLinkId === link.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             </Button>
                           </div>
                         </div>
