@@ -3,11 +3,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2 } from 'lucide-react'
+import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2, Calendar, TrendingDown, Activity } from 'lucide-react'
 import { supabase, type ShortLink } from '@/lib/supabase'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
 import EnvironmentCheck from '@/components/EnvironmentCheck'
+
+interface ClickStats {
+  today: number
+  yesterday: number
+  last7Days: number
+  last30Days: number
+  total: number
+}
 
 export default function HomePage() {
   const [originalUrl, setOriginalUrl] = useState('')
@@ -19,6 +27,14 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState<'created_at' | 'click_count'>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null)
+  const [clickStats, setClickStats] = useState<ClickStats>({
+    today: 0,
+    yesterday: 0,
+    last7Days: 0,
+    last30Days: 0,
+    total: 0
+  })
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
 
   // Add error logging
   console.log('HomePage component rendering...')
@@ -27,7 +43,70 @@ export default function HomePage() {
   useEffect(() => {
     console.log('HomePage useEffect - fetching links...')
     fetchShortLinks()
+    fetchClickStats()
   }, [])
+
+  // Update document title
+  useEffect(() => {
+    document.title = 'GoLinks - Advanced URL Shortener with Analytics'
+  }, [])
+
+  const fetchClickStats = async () => {
+    setIsLoadingStats(true)
+    try {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+      const last7Days = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const last30Days = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      // Fetch click statistics for different time periods
+      const { data: referrerClicks, error } = await supabase
+        .from('referrer_clicks')
+        .select('clicked_at')
+        .gte('clicked_at', last30Days.toISOString())
+
+      if (error) {
+        console.error('Error fetching click stats:', error)
+        return
+      }
+
+      const clicks = referrerClicks || []
+      const todayClicks = clicks.filter(click => 
+        new Date(click.clicked_at) >= today
+      ).length
+      
+      const yesterdayClicks = clicks.filter(click => {
+        const clickDate = new Date(click.clicked_at)
+        return clickDate >= yesterday && clickDate < today
+      }).length
+      
+      const last7DaysClicks = clicks.filter(click => 
+        new Date(click.clicked_at) >= last7Days
+      ).length
+      
+      const last30DaysClicks = clicks.length
+
+      // Get total clicks from short_links table
+      const { data: totalData } = await supabase
+        .from('short_links')
+        .select('click_count')
+
+      const totalClicks = totalData?.reduce((sum, link) => sum + link.click_count, 0) || 0
+
+      setClickStats({
+        today: todayClicks,
+        yesterday: yesterdayClicks,
+        last7Days: last7DaysClicks,
+        last30Days: last30DaysClicks,
+        total: totalClicks
+      })
+    } catch (error) {
+      console.error('Error calculating click stats:', error)
+    } finally {
+      setIsLoadingStats(false)
+    }
+  }
 
   const fetchShortLinks = async () => {
     try {
@@ -105,8 +184,8 @@ export default function HomePage() {
       toast.success('Short link created!')
       setOriginalUrl('')
       
-      // Refresh the links list
-      await fetchShortLinks()
+      // Refresh both links and stats
+      await Promise.all([fetchShortLinks(), fetchClickStats()])
     } catch (error) {
       console.error('Error creating link:', error)
       toast.error('Failed to create short link')
@@ -185,8 +264,8 @@ export default function HomePage() {
       // Remove from local state immediately for better UX
       setShortLinks(prevLinks => prevLinks.filter(link => link.id !== linkId))
       
-      // Also refresh from server to ensure consistency
-      await fetchShortLinks()
+      // Refresh both links and stats to ensure consistency
+      await Promise.all([fetchShortLinks(), fetchClickStats()])
     } catch (error) {
       console.error('Error deleting link:', error)
       toast.error(`Failed to delete link: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -266,12 +345,25 @@ export default function HomePage() {
         {/* Enhanced Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <Link2 className="h-10 w-10 text-blue-600 mr-3" />
+            <div className="relative mr-4">
+              <img 
+                src="/golinks-logo.svg" 
+                alt="GoLinks Logo" 
+                className="h-12 w-auto"
+                onError={(e) => {
+                  // Fallback to icon if logo fails to load
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const fallback = document.createElement('div')
+                  fallback.className = 'h-12 w-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center'
+                  fallback.innerHTML = '<svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>'
+                  target.parentNode?.insertBefore(fallback, target)
+                }}
+              />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
             <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              HappyDeel Links
+              GoLinks
             </h1>
           </div>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
@@ -282,63 +374,174 @@ export default function HomePage() {
         {/* Environment Check for Testing */}
         <EnvironmentCheck />
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Links</p>
-                  <p className="text-3xl font-bold text-blue-600">{totalLinks}</p>
-                </div>
-                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Link2 className="h-6 w-6 text-blue-600" />
-                </div>
+        {/* Advanced Analytics Dashboard */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Activity className="h-5 w-5 text-white" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+                <p className="text-gray-600">Track your link performance over time</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchClickStats()
+                fetchShortLinks()
+              }}
+              disabled={isLoadingStats}
+              className="flex items-center space-x-2"
+            >
+              {isLoadingStats ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              ) : (
+                <div className="h-4 w-4">🔄</div>
+              )}
+              <span>Refresh</span>
+            </Button>
+          </div>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Clicks</p>
-                  <p className="text-3xl font-bold text-green-600">{totalClicks.toLocaleString()}</p>
+          {/* Time-based Analytics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            {/* Today's Clicks */}
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Today</p>
+                    <p className="text-2xl font-bold text-green-800">
+                      {isLoadingStats ? '...' : clickStats.today.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-green-600">clicks</p>
+                  </div>
+                  <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-5 w-5 text-green-700" />
+                  </div>
                 </div>
-                <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Eye className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avg. Clicks</p>
-                  <p className="text-3xl font-bold text-purple-600">{averageClicks}</p>
+            {/* Yesterday's Clicks */}
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Yesterday</p>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {isLoadingStats ? '...' : clickStats.yesterday.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-blue-600">clicks</p>
+                  </div>
+                  <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-blue-700" />
+                  </div>
                 </div>
-                <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Top Performer</p>
-                  <p className="text-lg font-bold text-orange-600">{topPerformer.click_count} clicks</p>
+            {/* Last 7 Days */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Last 7 Days</p>
+                    <p className="text-2xl font-bold text-purple-800">
+                      {isLoadingStats ? '...' : clickStats.last7Days.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-purple-600">clicks</p>
+                  </div>
+                  <div className="h-10 w-10 bg-purple-200 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-purple-700" />
+                  </div>
                 </div>
-                <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <Globe className="h-6 w-6 text-orange-600" />
+              </CardContent>
+            </Card>
+
+            {/* Last 30 Days */}
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Last 30 Days</p>
+                    <p className="text-2xl font-bold text-orange-800">
+                      {isLoadingStats ? '...' : clickStats.last30Days.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-orange-600">clicks</p>
+                  </div>
+                  <div className="h-10 w-10 bg-orange-200 rounded-lg flex items-center justify-center">
+                    <Activity className="h-5 w-5 text-orange-700" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Total Clicks */}
+            <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Total Clicks</p>
+                    <p className="text-2xl font-bold text-indigo-800">
+                      {isLoadingStats ? '...' : clickStats.total.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-indigo-600">all time</p>
+                  </div>
+                  <div className="h-10 w-10 bg-indigo-200 rounded-lg flex items-center justify-center">
+                    <Eye className="h-5 w-5 text-indigo-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Performance Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Links</p>
+                    <p className="text-2xl font-bold text-blue-600">{totalLinks}</p>
+                  </div>
+                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Link2 className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Avg. Clicks</p>
+                    <p className="text-2xl font-bold text-purple-600">{averageClicks}</p>
+                  </div>
+                  <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Top Performer</p>
+                    <p className="text-lg font-bold text-orange-600">{topPerformer.click_count} clicks</p>
+                  </div>
+                  <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Globe className="h-5 w-5 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Enhanced Create Link Form */}
@@ -615,7 +818,7 @@ export default function HomePage() {
         <footer className="text-center mt-16 text-gray-500">
           <div className="flex items-center justify-center space-x-2 mb-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium">HappyDeel Links</span>
+            <span className="text-sm font-medium">GoLinks</span>
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
           </div>
           <p className="text-sm">Advanced URL shortening with global analytics</p>

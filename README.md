@@ -1,13 +1,14 @@
-# HappyDeel Links - URL Shortener (Vite.js)
+# GoLinks - Advanced URL Shortener with Analytics
 
-A modern, fast, and production-ready URL shortener built with Vite.js, React, Supabase, and TailwindCSS. Designed to be deployed on Vercel with custom domain support.
+A modern, fast, and production-ready URL shortener built with Vite.js, React, Supabase, and TailwindCSS. Features advanced analytics, geolocation tracking, and a beautiful UI. Designed to be deployed on Vercel with custom domain support.
 
 ## 🚀 Features
 
 - **Lightning Fast**: Built with Vite.js for instant hot reload and optimized builds
 - **Clean UI**: Minimal, responsive design built with TailwindCSS and custom components
 - **Fast Redirects**: Optimized for speed with efficient database queries
-- **Click Tracking**: Monitor how many times each link has been accessed
+- **Advanced Analytics**: Real-time click tracking with time-based statistics
+- **Geolocation Tracking**: Track clicks by country, city, and IP address
 - **Referrer Analytics**: Track where your clicks come from (e.g., depop.com, facebook.com)
 - **Country Tracking**: See which countries your clicks originate from with flag emojis
 - **Auto-increment Slugs**: Automatically generates p1, p2, p3... for easy management
@@ -28,7 +29,7 @@ A modern, fast, and production-ready URL shortener built with Vite.js, React, Su
 
 ```bash
 git clone <your-repo>
-cd happydeel-links
+cd golinks
 npm install
 ```
 
@@ -36,10 +37,13 @@ npm install
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to Settings > API to get your keys
-3. Run the migration in the Supabase SQL Editor:
+3. Run the migrations in the Supabase SQL Editor:
 
 ```sql
--- Copy and paste the contents of supabase/migrations/20250712000937_foggy_rain.sql
+-- Copy and paste the contents of:
+-- supabase/migrations/20250712000937_foggy_rain.sql
+-- supabase/migrations/20250712000938_add_referrer_tracking.sql
+-- supabase/migrations/20250712000939_add_delete_policy.sql
 ```
 
 ### 3. Environment Variables
@@ -49,7 +53,7 @@ Create a `.env.local` file in the root directory:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_BASE_URL=https://go.happydeel.com
+VITE_BASE_URL=https://your-domain.com
 ```
 
 ### 4. Local Development
@@ -81,9 +85,8 @@ vercel
 
 1. In your Vercel dashboard, go to your project settings
 2. Navigate to "Domains"
-3. Add `go.happydeel.com` as a custom domain
-4. Update your DNS settings to point to Vercel:
-   - Add a CNAME record: `go` → `cname.vercel-dns.com`
+3. Add your custom domain
+4. Update your DNS settings to point to Vercel
 
 ### 3. Environment Variables in Vercel
 
@@ -138,17 +141,18 @@ CREATE TABLE referrer_clicks (
 4. Returns the short URL for copying and sharing
 
 ### Redirecting
-1. User visits `go.happydeel.com/p1`
+1. User visits your domain with a slug (e.g., `yourdomain.com/p1`)
 2. React Router captures the slug parameter
 3. App queries Supabase for the original URL
 4. Records referrer information (where the click came from)
-5. Captures geolocation data (country, city) asynchronously
+5. Captures geolocation data (country, city, IP) asynchronously
 6. Increments click count asynchronously
 7. Redirects user to the original URL
 
-### Referrer Analytics
+### Advanced Analytics
+- **Time-based Statistics**: Today, yesterday, last 7 days, last 30 days
 - **Automatic Tracking**: Every click is recorded with referrer information
-- **Domain Extraction**: Shows which websites are driving traffic (e.g., depop.com, facebook.com)
+- **Domain Extraction**: Shows which websites are driving traffic
 - **Device Detection**: Tracks mobile vs desktop usage
 - **Country Tracking**: Shows which countries your clicks originate from with flag emojis
 - **City Information**: Displays city names when available
@@ -167,7 +171,7 @@ const newSlug = `p${nextNumber}`
 // Custom examples:
 const newSlug = `link${nextNumber}`        // link1, link2, link3...
 const newSlug = `${nextNumber}`            // 1, 2, 3...
-const newSlug = `hd${nextNumber}`          // hd1, hd2, hd3...
+const newSlug = `go${nextNumber}`          // go1, go2, go3...
 ```
 
 ### Styling
@@ -214,4 +218,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**Built with ⚡ Vite.js and ❤️ for HappyDeel**
+**Built with ⚡ Vite.js and ❤️ for GoLinks**
