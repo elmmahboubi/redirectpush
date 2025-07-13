@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { ChevronDown, ChevronUp, Globe, ExternalLink, MapPin } from 'lucide-react'
+import { ChevronDown, ChevronUp, Globe, ExternalLink, MapPin, Shield } from 'lucide-react'
 import { supabase, type ReferrerClick, extractDomain, getCountryFlag } from '@/lib/supabase'
 
 interface ReferrerAnalyticsProps {
@@ -74,6 +74,16 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
     return acc
   }, {} as Record<string, { count: number; clicks: ReferrerClick[]; countryCode: string | null }>)
 
+  // Proxy statistics
+  const proxyStats = referrerClicks.reduce((acc, click) => {
+    if (click.is_proxy) {
+      acc.proxyCount++
+    } else {
+      acc.directCount++
+    }
+    return acc
+  }, { proxyCount: 0, directCount: 0 })
+
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -135,7 +145,7 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
           </Button>
         </div>
         <CardDescription>
-          Track where your clicks are coming from
+          Track where your clicks are coming from with VPN/proxy detection
         </CardDescription>
       </CardHeader>
 
@@ -155,7 +165,7 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
           ) : (
             <div className="space-y-6">
               {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
                 <div className="bg-blue-50 p-3 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{totalClicks}</div>
                   <div className="text-xs text-gray-600">Total Clicks</div>
@@ -184,7 +194,43 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
                   </div>
                   <div className="text-xs text-gray-600">With Location</div>
                 </div>
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {proxyStats.proxyCount}
+                  </div>
+                  <div className="text-xs text-gray-600">VPN/Proxy</div>
+                </div>
               </div>
+
+              {/* Connection Type Breakdown */}
+              {totalClicks > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Connection Types
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-lg font-semibold text-green-700">Direct Connections</div>
+                          <div className="text-sm text-green-600">{proxyStats.directCount} clicks</div>
+                        </div>
+                        <div className="text-2xl">🌐</div>
+                      </div>
+                    </div>
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-lg font-semibold text-yellow-700">VPN/Proxy</div>
+                          <div className="text-sm text-yellow-600">{proxyStats.proxyCount} clicks</div>
+                        </div>
+                        <div className="text-2xl">🛡️</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Country Breakdown */}
               {Object.keys(countryStats).length > 0 && (
@@ -251,6 +297,7 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
                       <TableRow>
                         <TableHead>Referrer</TableHead>
                         <TableHead>Location</TableHead>
+                        <TableHead>Connection</TableHead>
                         <TableHead>Time</TableHead>
                         <TableHead>Device</TableHead>
                       </TableRow>
@@ -283,6 +330,15 @@ export default function ReferrerAnalytics({ shortLinkId, slug }: ReferrerAnalyti
                                 {click.city && `, ${click.city}`}
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              click.is_proxy 
+                                ? 'bg-yellow-100 text-yellow-800' 
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {click.is_proxy ? '🛡️ VPN/Proxy' : '🌐 Direct'}
+                            </span>
                           </TableCell>
                           <TableCell className="text-gray-600">
                             {formatDate(click.clicked_at)}

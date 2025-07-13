@@ -12,6 +12,8 @@
     - `country` (text) - Country where the click originated
     - `country_code` (text) - ISO country code (e.g., US, GB, FR)
     - `city` (text) - City where the click originated (optional)
+    - `is_proxy` (boolean) - Whether the connection is through VPN/proxy
+    - `real_ip` (text) - The actual IP address detected
     - `clicked_at` (timestamp, default now())
 
   2. Security
@@ -29,6 +31,8 @@ CREATE TABLE IF NOT EXISTS referrer_clicks (
   country text, -- Country where the click originated
   country_code text, -- ISO country code (e.g., US, GB, FR)
   city text, -- City where the click originated (optional)
+  is_proxy boolean DEFAULT false, -- Whether the connection is through VPN/proxy
+  real_ip text, -- The actual IP address detected
   clicked_at timestamptz DEFAULT now()
 );
 
@@ -51,4 +55,5 @@ CREATE POLICY "Public read referrer clicks"
 -- Create index for referrer clicks lookups
 CREATE INDEX IF NOT EXISTS idx_referrer_clicks_short_link_id ON referrer_clicks(short_link_id);
 CREATE INDEX IF NOT EXISTS idx_referrer_clicks_clicked_at ON referrer_clicks(clicked_at);
-CREATE INDEX IF NOT EXISTS idx_referrer_clicks_country ON referrer_clicks(country); 
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_country ON referrer_clicks(country);
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_is_proxy ON referrer_clicks(is_proxy); 

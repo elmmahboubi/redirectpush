@@ -43,7 +43,9 @@ export default function RedirectPage() {
                 ip_address: null,
                 country: null,
                 country_code: null,
-                city: null
+                city: null,
+                is_proxy: null,
+                real_ip: null
               })
 
             if (referrerError) {
@@ -72,15 +74,19 @@ export default function RedirectPage() {
         // Get geolocation data and update record (non-blocking)
         const updateGeolocation = async () => {
           try {
-            const geoData = await getGeolocationWithTimeout(2000)
+            const geoData = await getGeolocationWithTimeout(4000) // 4 second timeout for robust detection
             if (geoData) {
+              console.log('Geolocation data received:', geoData)
+              
               // Update the most recent click record with geolocation data
               const { error: updateError } = await supabase
                 .from('referrer_clicks')
                 .update({
                   country: geoData.country,
                   country_code: geoData.country_code,
-                  city: geoData.city
+                  city: geoData.city,
+                  is_proxy: geoData.isProxy || false,
+                  real_ip: geoData.realIP || null
                 })
                 .eq('short_link_id', shortLink.id)
                 .eq('referrer', referrer)
@@ -90,8 +96,10 @@ export default function RedirectPage() {
               if (updateError) {
                 console.error('Failed to update geolocation data:', updateError)
               } else {
-                console.log('Geolocation data updated:', geoData)
+                console.log('Geolocation data updated successfully:', geoData)
               }
+            } else {
+              console.warn('No geolocation data received')
             }
           } catch (error) {
             console.warn('Geolocation failed:', error)
