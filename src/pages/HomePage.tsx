@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Copy, ExternalLink, Link2, BarChart3 } from 'lucide-react'
+import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe } from 'lucide-react'
 import { supabase, type ShortLink } from '@/lib/supabase'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
@@ -14,6 +14,9 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingLinks, setIsLoadingLinks] = useState(true)
   const [expandedAnalytics, setExpandedAnalytics] = useState<Set<string>>(new Set())
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortBy, setSortBy] = useState<'created_at' | 'click_count'>('created_at')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Add error logging
   console.log('HomePage component rendering...')
@@ -134,153 +137,332 @@ export default function HomePage() {
     return `${baseUrl}/${slug}`
   }
 
+  // Filter and sort links
+  const filteredAndSortedLinks = shortLinks
+    .filter(link => 
+      link.original_url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      link.slug.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === 'click_count') {
+        return sortOrder === 'desc' ? b.click_count - a.click_count : a.click_count - b.click_count
+      } else {
+        return sortOrder === 'desc' 
+          ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          : new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      }
+    })
+
+  // Calculate statistics
+  const totalClicks = shortLinks.reduce((sum, link) => sum + link.click_count, 0)
+  const totalLinks = shortLinks.length
+  const averageClicks = totalLinks > 0 ? Math.round(totalClicks / totalLinks) : 0
+  const topPerformer = shortLinks.reduce((max, link) => 
+    link.click_count > max.click_count ? link : max, 
+    { click_count: 0, slug: '', original_url: '', id: '', created_at: '' }
+  )
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto px-4 py-12">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Enhanced Header */}
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
-            <Link2 className="h-8 w-8 text-blue-600 mr-2" />
-            <h1 className="text-4xl font-bold text-gray-900">HappyDeel Links</h1>
+          <div className="flex items-center justify-center mb-6">
+            <div className="relative">
+              <Link2 className="h-10 w-10 text-blue-600 mr-3" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            </div>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              HappyDeel Links
+            </h1>
           </div>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Transform long URLs into short, shareable links instantly
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            Transform long URLs into short, shareable links with advanced analytics and global reach tracking
           </p>
         </div>
 
-        {/* Create Link Form */}
-        <Card className="max-w-2xl mx-auto mb-12 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Create Short Link</CardTitle>
-            <CardDescription className="text-center">
-              Enter your long URL below to generate a short link
-            </CardDescription>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Links</p>
+                  <p className="text-3xl font-bold text-blue-600">{totalLinks}</p>
+                </div>
+                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Link2 className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Clicks</p>
+                  <p className="text-3xl font-bold text-green-600">{totalClicks.toLocaleString()}</p>
+                </div>
+                <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Eye className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg. Clicks</p>
+                  <p className="text-3xl font-bold text-purple-600">{averageClicks}</p>
+                </div>
+                <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Top Performer</p>
+                  <p className="text-lg font-bold text-orange-600">{topPerformer.click_count} clicks</p>
+                </div>
+                <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Globe className="h-6 w-6 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Enhanced Create Link Form */}
+        <Card className="max-w-4xl mx-auto mb-8 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+          <CardHeader className="pb-6">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Plus className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Create New Short Link</CardTitle>
+                <CardDescription className="text-base">
+                  Enter your long URL below to generate a short, trackable link
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={createShortLink} className="space-y-4">
               <div className="relative">
                 <Input
                   type="url"
-                  placeholder="https://example.com/very/long/url"
+                  placeholder="https://example.com/very/long/url/that/needs/shortening"
                   value={originalUrl}
                   onChange={(e) => setOriginalUrl(e.target.value)}
-                  className="pr-20 h-12 text-lg"
+                  className="pr-24 h-14 text-lg border-2 focus:border-blue-500 transition-colors"
                   disabled={isLoading}
                 />
                 <Button
                   type="submit"
                   disabled={isLoading || !originalUrl.trim()}
-                  className="absolute right-1 top-1 h-10 px-6"
+                  className="absolute right-2 top-2 h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
                 >
-                  {isLoading ? 'Creating...' : 'Shorten'}
+                  {isLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Creating...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Plus className="h-4 w-4" />
+                      <span>Shorten</span>
+                    </div>
+                  )}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        {/* Links Table */}
-        <Card className="max-w-6xl mx-auto shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl">Your Short Links</CardTitle>
-            <CardDescription>
-              Manage and track your shortened URLs
-            </CardDescription>
+        {/* Enhanced Links Management */}
+        <Card className="max-w-7xl mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl">Your Short Links</CardTitle>
+                  <CardDescription className="text-base">
+                    Manage and analyze your shortened URLs with advanced tracking
+                  </CardDescription>
+                </div>
+              </div>
+              
+              {/* Search and Filter Controls */}
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search links..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64 border-2 focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSortBy(sortBy === 'created_at' ? 'click_count' : 'created_at')
+                      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')
+                    }}
+                    className="flex items-center space-x-2"
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>{sortBy === 'created_at' ? 'Date' : 'Clicks'}</span>
+                    <span className="text-xs">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </CardHeader>
+          
           <CardContent>
             {isLoadingLinks ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600">Loading links...</p>
-              </div>
-            ) : shortLinks.length === 0 ? (
               <div className="text-center py-12">
-                <Link2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg">No short links created yet</p>
-                <p className="text-gray-500">Create your first short link above!</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 text-lg">Loading your links...</p>
+                <p className="text-gray-500 text-sm">This will just take a moment</p>
+              </div>
+            ) : filteredAndSortedLinks.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Link2 className="h-12 w-12 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {searchTerm ? 'No links found' : 'No short links yet'}
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  {searchTerm 
+                    ? 'Try adjusting your search terms or create a new link above.'
+                    : 'Create your first short link above to start tracking and analyzing your URLs.'
+                  }
+                </p>
+                {!searchTerm && (
+                  <Button 
+                    onClick={() => document.getElementById('url-input')?.focus()}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Link
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
-                {shortLinks.map((link) => (
-                  <div key={link.id} className="border rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Short Link</TableHead>
-                            <TableHead>Original URL</TableHead>
-                            <TableHead className="text-center">Clicks</TableHead>
-                            <TableHead>Created</TableHead>
-                            <TableHead className="text-center">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow className="hover:bg-gray-50/50">
-                            <TableCell className="font-mono">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-blue-600 font-medium">
-                                  {getShortUrl(link.slug)}
-                                </span>
+                {filteredAndSortedLinks.map((link) => (
+                  <div key={link.id} className="group">
+                    <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          {/* Link Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0">
+                                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                  <Link2 className="h-6 w-6 text-blue-600" />
+                                </div>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="max-w-md truncate" title={link.original_url}>
-                                {link.original_url}
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                    {getShortUrl(link.slug)}
+                                  </h3>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {link.slug}
+                                  </span>
+                                </div>
+                                
+                                <p className="text-sm text-gray-600 truncate max-w-md">
+                                  {link.original_url}
+                                </p>
+                                
+                                <div className="flex items-center space-x-4 mt-3">
+                                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                    <Eye className="h-4 w-4" />
+                                    <span>{link.click_count} clicks</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                                    <Clock className="h-4 w-4" />
+                                    <span>{formatDate(link.created_at)}</span>
+                                  </div>
+                                </div>
                               </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="bg-gray-100 px-2 py-1 rounded-full text-sm font-medium">
-                                {link.click_count}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-gray-600">
-                              {formatDate(link.created_at)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-center space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => copyToClipboard(getShortUrl(link.slug))}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => window.open(link.original_url, '_blank')}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const newExpanded = new Set(expandedAnalytics)
-                                    if (newExpanded.has(link.id)) {
-                                      newExpanded.delete(link.id)
-                                    } else {
-                                      newExpanded.add(link.id)
-                                    }
-                                    setExpandedAnalytics(newExpanded)
-                                  }}
-                                  className="h-8 w-8 p-0"
-                                  title="View Analytics"
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center space-x-2 ml-6">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyToClipboard(getShortUrl(link.slug))}
+                              className="h-9 w-9 p-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                              title="Copy link"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(link.original_url, '_blank')}
+                              className="h-9 w-9 p-0 hover:bg-green-50 hover:border-green-300 transition-colors"
+                              title="Visit original URL"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newExpanded = new Set(expandedAnalytics)
+                                if (newExpanded.has(link.id)) {
+                                  newExpanded.delete(link.id)
+                                } else {
+                                  newExpanded.add(link.id)
+                                }
+                                setExpandedAnalytics(newExpanded)
+                              }}
+                              className={`h-9 w-9 p-0 transition-colors ${
+                                expandedAnalytics.has(link.id)
+                                  ? 'bg-purple-50 border-purple-300 text-purple-600'
+                                  : 'hover:bg-purple-50 hover:border-purple-300'
+                              }`}
+                              title="View analytics"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                     
                     {/* Analytics Section */}
                     {expandedAnalytics.has(link.id) && (
-                      <ReferrerAnalytics shortLinkId={link.id} slug={link.slug} />
+                      <div className="mt-4 ml-6">
+                        <ReferrerAnalytics shortLinkId={link.id} slug={link.slug} />
+                      </div>
                     )}
                   </div>
                 ))}
@@ -289,9 +471,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
-        <footer className="text-center mt-12 text-gray-500">
-          <p>© 2025 HappyDeel. All rights reserved.</p>
+        {/* Enhanced Footer */}
+        <footer className="text-center mt-16 text-gray-500">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium">HappyDeel Links</span>
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+          </div>
+          <p className="text-sm">Advanced URL shortening with global analytics</p>
         </footer>
       </div>
     </div>
