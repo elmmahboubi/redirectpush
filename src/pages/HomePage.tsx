@@ -81,6 +81,7 @@ export default function HomePage() {
   // Fetch deleted links when tab changes
   useEffect(() => {
     if (isAuthenticated && activeTab === 'deleted') {
+      console.log('🔄 Tab changed to deleted, fetching deleted links...')
       fetchDeletedLinks()
     }
   }, [isAuthenticated, activeTab])
@@ -177,10 +178,11 @@ export default function HomePage() {
       
       const last30DaysClicks = clicks.length
 
-      // Get total clicks from short_links table
+      // Get total clicks from short_links table (only active links)
       const { data: totalData } = await supabase
         .from('short_links')
         .select('click_count')
+        .eq('deleted', false)
 
       const totalClicks = totalData?.reduce((sum, link) => sum + link.click_count, 0) || 0
 
@@ -204,6 +206,7 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from('short_links')
         .select('*')
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -224,7 +227,7 @@ export default function HomePage() {
   const fetchDeletedLinks = async () => {
     setIsLoadingDeletedLinks(true)
     try {
-      console.log('Fetching deleted links from Supabase...')
+      console.log('🔍 Fetching deleted links from Supabase...')
       const { data, error } = await supabase
         .from('short_links')
         .select('*')
@@ -232,14 +235,17 @@ export default function HomePage() {
         .order('deleted_at', { ascending: false })
 
       if (error) {
-        console.error('Supabase error:', error)
+        console.error('❌ Supabase error:', error)
         throw error
       }
       
-      console.log('Fetched deleted links:', data?.length || 0)
+      console.log('✅ Fetched deleted links:', data?.length || 0)
+      if (data && data.length > 0) {
+        console.log('📋 Deleted links:', data.map(link => ({ id: link.id, slug: link.slug, deleted_at: link.deleted_at })))
+      }
       setDeletedLinks(data || [])
     } catch (error) {
-      console.error('Error fetching deleted links:', error)
+      console.error('❌ Error fetching deleted links:', error)
       toast.error('Failed to load deleted links')
     } finally {
       setIsLoadingDeletedLinks(false)
@@ -265,10 +271,11 @@ export default function HomePage() {
     setIsLoading(true)
 
     try {
-      // Get the next available slug number
+      // Get the next available slug number (only from active links)
       const { data: lastLink } = await supabase
         .from('short_links')
         .select('slug')
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
         .limit(1)
 
@@ -375,7 +382,7 @@ export default function HomePage() {
         throw new Error('Link was not deleted successfully')
       }
 
-      console.log('Link soft deletion verified successfully')
+      console.log('✅ Link soft deletion verified successfully')
 
       toast.success('Link moved to deleted links!')
       
@@ -384,6 +391,12 @@ export default function HomePage() {
       
       // Refresh both links and stats to ensure consistency
       await Promise.all([fetchShortLinks(), fetchClickStats()])
+      
+      // Also refresh deleted links if we're on that tab
+      if (activeTab === 'deleted') {
+        console.log('🔄 Refreshing deleted links tab...')
+        await fetchDeletedLinks()
+      }
     } catch (error) {
       console.error('Error deleting link:', error)
       toast.error(`Failed to delete link: ${error instanceof Error ? error.message : 'Unknown error'}`)
