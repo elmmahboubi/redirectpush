@@ -345,26 +345,23 @@ export default function HomePage() {
         {/* Enhanced Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-6">
-            <div className="relative mr-4">
+            <div className="relative">
               <img 
                 src="/golinks-logo.svg" 
-                alt="GoLinks Logo" 
-                className="h-12 w-auto"
+                alt="GoLinks" 
+                className="h-20 w-auto"
                 onError={(e) => {
                   // Fallback to icon if logo fails to load
                   const target = e.target as HTMLImageElement
                   target.style.display = 'none'
                   const fallback = document.createElement('div')
-                  fallback.className = 'h-12 w-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center'
-                  fallback.innerHTML = '<svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>'
+                  fallback.className = 'h-20 w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center'
+                  fallback.innerHTML = '<svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>'
                   target.parentNode?.insertBefore(fallback, target)
                 }}
               />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              GoLinks
-            </h1>
           </div>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Transform long URLs into short, shareable links with advanced analytics and global reach tracking
@@ -499,7 +496,7 @@ export default function HomePage() {
           </div>
 
           {/* Performance Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -509,20 +506,6 @@ export default function HomePage() {
                   </div>
                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Link2 className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Avg. Clicks</p>
-                    <p className="text-2xl font-bold text-purple-600">{averageClicks}</p>
-                  </div>
-                  <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
@@ -712,9 +695,29 @@ export default function HomePage() {
                                 </p>
                                 
                                 <div className="flex items-center space-x-4 mt-3">
-                                  <div className="flex items-center space-x-1 text-sm text-gray-500">
-                                    <Eye className="h-4 w-4" />
-                                    <span>{link.click_count} clicks</span>
+                                  {/* Enhanced Click Count Display */}
+                                  <div className="flex items-center space-x-2">
+                                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                      link.click_count === 0 
+                                        ? 'bg-gray-100 text-gray-500' 
+                                        : link.click_count < 10 
+                                        ? 'bg-green-100 text-green-700' 
+                                        : link.click_count < 50 
+                                        ? 'bg-blue-100 text-blue-700' 
+                                        : link.click_count < 100 
+                                        ? 'bg-purple-100 text-purple-700' 
+                                        : 'bg-orange-100 text-orange-700'
+                                    }`}>
+                                      <Eye className="h-3 w-3 inline mr-1" />
+                                      {link.click_count} {link.click_count === 1 ? 'click' : 'clicks'}
+                                    </div>
+                                    {link.click_count > 0 && (
+                                      <div className="text-xs text-gray-400">
+                                        {link.click_count < 10 ? '🆕' : 
+                                         link.click_count < 50 ? '🔥' : 
+                                         link.click_count < 100 ? '⚡' : '🚀'}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="flex items-center space-x-1 text-sm text-gray-500">
                                     <Clock className="h-4 w-4" />
