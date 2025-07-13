@@ -1,10 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getGeolocationWithTimeout } from '@/lib/geolocation'
 
 export default function RedirectPage() {
   const { slug } = useParams<{ slug: string }>()
+  const [destinationTitle, setDestinationTitle] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const handleRedirect = async () => {
@@ -26,6 +28,32 @@ export default function RedirectPage() {
           console.log(`Slug not found: ${slug}`)
           return
         }
+
+        // Try to fetch the destination page title
+        const fetchPageTitle = async (url: string) => {
+          try {
+            const response = await fetch(url, {
+              method: 'HEAD',
+              mode: 'no-cors'
+            })
+            // Since we can't read the response due to CORS, we'll extract domain
+            const urlObj = new URL(url)
+            const domain = urlObj.hostname.replace('www.', '')
+            setDestinationTitle(domain)
+          } catch (error) {
+            // Fallback to domain name
+            try {
+              const urlObj = new URL(url)
+              const domain = urlObj.hostname.replace('www.', '')
+              setDestinationTitle(domain)
+            } catch {
+              setDestinationTitle('Destination')
+            }
+          }
+        }
+
+        // Fetch page title in background
+        fetchPageTitle(shortLink.original_url)
 
         // Capture referrer information
         const referrer = document.referrer || null
@@ -129,8 +157,12 @@ export default function RedirectPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600 text-lg">Redirecting...</p>
-        <p className="text-gray-400 text-sm mt-2">Tracking your location for analytics</p>
+        <p className="text-gray-600 text-lg">Loading...</p>
+        {destinationTitle && (
+          <p className="text-gray-400 text-sm mt-2">
+            Preparing to visit <span className="font-medium text-blue-600">{destinationTitle}</span>
+          </p>
+        )}
       </div>
     </div>
   )
