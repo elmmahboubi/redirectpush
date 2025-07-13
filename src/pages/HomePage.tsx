@@ -133,23 +133,90 @@ export default function HomePage() {
     setDeletingLinkId(linkId)
     
     try {
+      console.log(`Attempting to delete link: ${slug} (ID: ${linkId})`)
+      
+      // First, verify the link exists
+      const { data: existingLink, error: fetchError } = await supabase
+        .from('short_links')
+        .select('id, slug, original_url')
+        .eq('id', linkId)
+        .single()
+
+      if (fetchError) {
+        console.error('Error fetching link before deletion:', fetchError)
+        throw new Error('Link not found')
+      }
+
+      if (!existingLink) {
+        throw new Error('Link not found')
+      }
+
+      console.log('Link found, proceeding with deletion:', existingLink)
+
       // Delete the short link (this will cascade delete referrer_clicks due to foreign key)
-      const { error } = await supabase
+      const { error: deleteError, count } = await supabase
         .from('short_links')
         .delete()
         .eq('id', linkId)
 
-      if (error) throw error
+      if (deleteError) {
+        console.error('Supabase delete error:', deleteError)
+        throw deleteError
+      }
+
+      console.log(`Delete operation completed. Rows affected: ${count}`)
+
+      // Verify deletion by trying to fetch the link again
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('short_links')
+        .select('id')
+        .eq('id', linkId)
+        .single()
+
+      if (verifyData) {
+        console.warn('Link still exists after deletion attempt:', verifyData)
+        throw new Error('Link was not deleted successfully')
+      }
+
+      console.log('Link deletion verified successfully')
 
       toast.success('Link deleted successfully!')
       
-      // Refresh the links list
+      // Remove from local state immediately for better UX
+      setShortLinks(prevLinks => prevLinks.filter(link => link.id !== linkId))
+      
+      // Also refresh from server to ensure consistency
       await fetchShortLinks()
     } catch (error) {
       console.error('Error deleting link:', error)
-      toast.error('Failed to delete link')
+      toast.error(`Failed to delete link: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setDeletingLinkId(null)
+    }
+  }
+
+  // Test function to verify deletion is working
+  const testDeletion = async (linkId: string, slug: string) => {
+    console.log('🧪 Testing deletion for:', slug)
+    
+    try {
+      // Test if link exists
+      const { data, error } = await supabase
+        .from('short_links')
+        .select('*')
+        .eq('id', linkId)
+        .single()
+      
+      if (error) {
+        console.log('❌ Link not found in database:', error)
+        return false
+      }
+      
+      console.log('✅ Link found in database:', data)
+      return true
+    } catch (error) {
+      console.error('❌ Error testing deletion:', error)
+      return false
     }
   }
 
@@ -364,6 +431,17 @@ export default function HomePage() {
                     <span>{sortBy === 'created_at' ? 'Date' : 'Clicks'}</span>
                     <span className="text-xs">{sortOrder === 'desc' ? '↓' : '↑'}</span>
                   </Button>
+                  
+                  {/* Manual refresh button for debugging */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchShortLinks}
+                    className="flex items-center space-x-2"
+                    title="Refresh links"
+                  >
+                    <div className="h-4 w-4">🔄</div>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -502,6 +580,19 @@ export default function HomePage() {
                                 <Trash2 className="h-4 w-4" />
                               )}
                             </Button>
+                            
+                            {/* Debug button - only in development */}
+                            {import.meta.env.DEV && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => testDeletion(link.id, link.slug)}
+                                className="h-9 w-9 p-0 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600 transition-colors"
+                                title="Test deletion (dev only)"
+                              >
+                                🧪
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
