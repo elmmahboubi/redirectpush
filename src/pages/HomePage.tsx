@@ -49,6 +49,11 @@ export default function HomePage() {
     password: ''
   })
 
+  // Tab state for links management
+  const [activeTab, setActiveTab] = useState<'active' | 'deleted'>('active')
+  const [deletedLinks, setDeletedLinks] = useState<ShortLink[]>([])
+  const [isLoadingDeletedLinks, setIsLoadingDeletedLinks] = useState(false)
+
   // Superuser credentials
   const SUPERUSER_CREDENTIALS = {
     username: 'elmahboubi',
@@ -72,6 +77,13 @@ export default function HomePage() {
       fetchClickStats()
     }
   }, [isAuthenticated])
+
+  // Fetch deleted links when tab changes
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'deleted') {
+      fetchDeletedLinks()
+    }
+  }, [isAuthenticated, activeTab])
 
   // Update document title
   useEffect(() => {
@@ -101,6 +113,32 @@ export default function HomePage() {
     setIsAuthenticated(false)
     localStorage.removeItem('golinks_authenticated')
     toast.success('Logged out successfully')
+  }
+
+  const restoreDeletedLink = async (linkId: string, slug: string) => {
+    if (!confirm(`Are you sure you want to restore the link "${slug}"?`)) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('short_links')
+        .update({ 
+          deleted: false, 
+          deleted_at: null 
+        })
+        .eq('id', linkId)
+
+      if (error) throw error
+
+      toast.success('Link restored successfully!')
+      
+      // Refresh both active and deleted links
+      await Promise.all([fetchShortLinks(), fetchDeletedLinks()])
+    } catch (error) {
+      console.error('Error restoring link:', error)
+      toast.error('Failed to restore link')
+    }
   }
 
   const fetchClickStats = async () => {
@@ -180,6 +218,31 @@ export default function HomePage() {
       toast.error('Failed to load links')
     } finally {
       setIsLoadingLinks(false)
+    }
+  }
+
+  const fetchDeletedLinks = async () => {
+    setIsLoadingDeletedLinks(true)
+    try {
+      console.log('Fetching deleted links from Supabase...')
+      const { data, error } = await supabase
+        .from('short_links')
+        .select('*')
+        .eq('deleted', true)
+        .order('deleted_at', { ascending: false })
+
+      if (error) {
+        console.error('Supabase error:', error)
+        throw error
+      }
+      
+      console.log('Fetched deleted links:', data?.length || 0)
+      setDeletedLinks(data || [])
+    } catch (error) {
+      console.error('Error fetching deleted links:', error)
+      toast.error('Failed to load deleted links')
+    } finally {
+      setIsLoadingDeletedLinks(false)
     }
   }
 
@@ -284,10 +347,13 @@ export default function HomePage() {
 
       console.log('Link found, proceeding with deletion:', existingLink)
 
-      // Delete the short link (this will cascade delete referrer_clicks due to foreign key)
+      // Mark the short link as deleted instead of actually deleting it
       const { error: deleteError, count } = await supabase
         .from('short_links')
-        .delete()
+        .update({ 
+          deleted: true, 
+          deleted_at: new Date().toISOString() 
+        })
         .eq('id', linkId)
 
       if (deleteError) {
@@ -295,25 +361,25 @@ export default function HomePage() {
         throw deleteError
       }
 
-      console.log(`Delete operation completed. Rows affected: ${count}`)
+      console.log(`Soft delete operation completed. Rows affected: ${count}`)
 
-      // Verify deletion by trying to fetch the link again
+      // Verify soft deletion
       const { data: verifyData, error: verifyError } = await supabase
         .from('short_links')
-        .select('id')
+        .select('id, deleted')
         .eq('id', linkId)
         .single()
 
-      if (verifyData) {
-        console.warn('Link still exists after deletion attempt:', verifyData)
+      if (!verifyData?.deleted) {
+        console.warn('Link was not marked as deleted:', verifyData)
         throw new Error('Link was not deleted successfully')
       }
 
-      console.log('Link deletion verified successfully')
+      console.log('Link soft deletion verified successfully')
 
-      toast.success('Link deleted successfully!')
+      toast.success('Link moved to deleted links!')
       
-      // Remove from local state immediately for better UX
+      // Remove from active links state immediately for better UX
       setShortLinks(prevLinks => prevLinks.filter(link => link.id !== linkId))
       
       // Refresh both links and stats to ensure consistency
@@ -483,35 +549,35 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Enhanced Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-6">
+        <div className="text-center mb-8 sm:mb-12">
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
             <div className="relative">
               <img 
                 src="/golinks-logo.svg" 
                 alt="GoLinks" 
-                className="h-20 w-auto"
+                className="h-16 sm:h-20 w-auto"
                 onError={(e) => {
                   // Fallback to icon if logo fails to load
                   const target = e.target as HTMLImageElement
                   target.style.display = 'none'
                   const fallback = document.createElement('div')
-                  fallback.className = 'h-20 w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center'
-                  fallback.innerHTML = '<svg class="h-10 w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>'
+                  fallback.className = 'h-16 sm:h-20 w-16 sm:w-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center'
+                  fallback.innerHTML = '<svg class="h-8 sm:h-10 w-8 sm:w-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>'
                   target.parentNode?.insertBefore(fallback, target)
                 }}
               />
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-4">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-4 px-4">
             Transform long URLs into short, shareable links with advanced analytics and global reach tracking
           </p>
           
           {/* User Info and Logout */}
-          <div className="flex items-center justify-center space-x-4">
-            <div className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <div className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-3 sm:px-4 py-2 rounded-full shadow-sm">
               <Shield className="h-4 w-4 text-green-600" />
               <span className="text-sm font-medium text-gray-700">Superuser: {SUPERUSER_CREDENTIALS.username}</span>
             </div>
@@ -531,15 +597,15 @@ export default function HomePage() {
         <EnvironmentCheck />
 
         {/* Advanced Analytics Dashboard */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-6">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Activity className="h-5 w-5 text-white" />
+              <div className="h-8 sm:h-10 w-8 sm:w-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Activity className="h-4 sm:h-5 w-4 sm:w-5 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
-                <p className="text-gray-600">Track your link performance over time</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Analytics Dashboard</h2>
+                <p className="text-sm sm:text-base text-gray-600">Track your link performance over time</p>
               </div>
             </div>
             <Button
@@ -550,32 +616,33 @@ export default function HomePage() {
                 fetchShortLinks()
               }}
               disabled={isLoadingStats}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 text-xs sm:text-sm"
             >
               {isLoadingStats ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-3 sm:h-4 w-3 sm:w-4 border-b-2 border-blue-600"></div>
               ) : (
-                <div className="h-4 w-4">🔄</div>
+                <div className="h-3 sm:h-4 w-3 sm:w-4">🔄</div>
               )}
-              <span>Refresh</span>
+              <span className="hidden sm:inline">Refresh</span>
+              <span className="sm:hidden">Refresh</span>
             </Button>
           </div>
 
           {/* Time-based Analytics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
             {/* Today's Clicks */}
             <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-green-700 uppercase tracking-wide">Today</p>
-                    <p className="text-2xl font-bold text-green-800">
+                    <p className="text-lg sm:text-2xl font-bold text-green-800">
                       {isLoadingStats ? '...' : clickStats.today.toLocaleString()}
                     </p>
                     <p className="text-xs text-green-600">clicks</p>
                   </div>
-                  <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                    <Calendar className="h-5 w-5 text-green-700" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
                   </div>
                 </div>
               </CardContent>
@@ -583,17 +650,17 @@ export default function HomePage() {
 
             {/* Yesterday's Clicks */}
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Yesterday</p>
-                    <p className="text-2xl font-bold text-blue-800">
+                    <p className="text-lg sm:text-2xl font-bold text-blue-800">
                       {isLoadingStats ? '...' : clickStats.yesterday.toLocaleString()}
                     </p>
                     <p className="text-xs text-blue-600">clicks</p>
                   </div>
-                  <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-blue-700" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-700" />
                   </div>
                 </div>
               </CardContent>
@@ -601,17 +668,17 @@ export default function HomePage() {
 
             {/* Last 7 Days */}
             <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-purple-700 uppercase tracking-wide">Last 7 Days</p>
-                    <p className="text-2xl font-bold text-purple-800">
+                    <p className="text-lg sm:text-2xl font-bold text-purple-800">
                       {isLoadingStats ? '...' : clickStats.last7Days.toLocaleString()}
                     </p>
                     <p className="text-xs text-purple-600">clicks</p>
                   </div>
-                  <div className="h-10 w-10 bg-purple-200 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-purple-700" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-purple-200 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-purple-700" />
                   </div>
                 </div>
               </CardContent>
@@ -619,17 +686,17 @@ export default function HomePage() {
 
             {/* Last 30 Days */}
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-orange-700 uppercase tracking-wide">Last 30 Days</p>
-                    <p className="text-2xl font-bold text-orange-800">
+                    <p className="text-lg sm:text-2xl font-bold text-orange-800">
                       {isLoadingStats ? '...' : clickStats.last30Days.toLocaleString()}
                     </p>
                     <p className="text-xs text-orange-600">clicks</p>
                   </div>
-                  <div className="h-10 w-10 bg-orange-200 rounded-lg flex items-center justify-center">
-                    <Activity className="h-5 w-5 text-orange-700" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-orange-200 rounded-lg flex items-center justify-center">
+                    <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-orange-700" />
                   </div>
                 </div>
               </CardContent>
@@ -637,17 +704,17 @@ export default function HomePage() {
 
             {/* Total Clicks */}
             <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Total Clicks</p>
-                    <p className="text-2xl font-bold text-indigo-800">
+                    <p className="text-lg sm:text-2xl font-bold text-indigo-800">
                       {isLoadingStats ? '...' : clickStats.total.toLocaleString()}
                     </p>
                     <p className="text-xs text-indigo-600">all time</p>
                   </div>
-                  <div className="h-10 w-10 bg-indigo-200 rounded-lg flex items-center justify-center">
-                    <Eye className="h-5 w-5 text-indigo-700" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-indigo-200 rounded-lg flex items-center justify-center">
+                    <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-700" />
                   </div>
                 </div>
               </CardContent>
@@ -655,30 +722,30 @@ export default function HomePage() {
           </div>
 
           {/* Performance Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Links</p>
-                    <p className="text-2xl font-bold text-blue-600">{totalLinks}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-600">Total Links</p>
+                    <p className="text-lg sm:text-2xl font-bold text-blue-600">{totalLinks}</p>
                   </div>
-                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Link2 className="h-5 w-5 text-blue-600" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Link2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Top Performer</p>
-                    <p className="text-lg font-bold text-orange-600">{topPerformer.click_count} clicks</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-600">Top Performer</p>
+                    <p className="text-base sm:text-lg font-bold text-orange-600">{topPerformer.click_count} clicks</p>
                   </div>
-                  <div className="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Globe className="h-5 w-5 text-orange-600" />
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                   </div>
                 </div>
               </CardContent>
@@ -687,15 +754,15 @@ export default function HomePage() {
         </div>
 
         {/* Enhanced Create Link Form */}
-        <Card className="max-w-4xl mx-auto mb-8 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader className="pb-6">
+        <Card className="max-w-4xl mx-auto mb-6 sm:mb-8 shadow-xl border-0 bg-white/90 backdrop-blur-sm">
+          <CardHeader className="pb-4 sm:pb-6">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Plus className="h-5 w-5 text-blue-600" />
+              <div className="h-8 sm:h-10 w-8 sm:w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Plus className="h-4 sm:h-5 w-4 sm:w-5 text-blue-600" />
               </div>
               <div>
-                <CardTitle className="text-2xl">Create New Short Link</CardTitle>
-                <CardDescription className="text-base">
+                <CardTitle className="text-xl sm:text-2xl">Create New Short Link</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
                   Enter your long URL below to generate a short, trackable link
                 </CardDescription>
               </div>
@@ -709,23 +776,25 @@ export default function HomePage() {
                   placeholder="https://example.com/very/long/url/that/needs/shortening"
                   value={originalUrl}
                   onChange={(e) => setOriginalUrl(e.target.value)}
-                  className="pr-24 h-14 text-lg border-2 focus:border-blue-500 transition-colors"
+                  className="pr-20 sm:pr-24 h-12 sm:h-14 text-base sm:text-lg border-2 focus:border-blue-500 transition-colors"
                   disabled={isLoading}
                 />
                 <Button
                   type="submit"
                   disabled={isLoading || !originalUrl.trim()}
-                  className="absolute right-2 top-2 h-10 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+                  className="absolute right-2 top-2 h-8 sm:h-10 px-3 sm:px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 text-sm sm:text-base"
                 >
                   {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Creating...</span>
+                    <div className="flex items-center space-x-1 sm:space-x-2">
+                      <div className="animate-spin rounded-full h-3 sm:h-4 w-3 sm:w-4 border-b-2 border-white"></div>
+                      <span className="hidden sm:inline">Creating...</span>
+                      <span className="sm:hidden">...</span>
                     </div>
                   ) : (
-                    <div className="flex items-center space-x-2">
-                      <Plus className="h-4 w-4" />
-                      <span>Shorten</span>
+                    <div className="flex items-center space-x-1 sm:space-x-2">
+                      <Plus className="h-3 sm:h-4 w-3 sm:w-4" />
+                      <span className="hidden sm:inline">Shorten</span>
+                      <span className="sm:hidden">Go</span>
                     </div>
                   )}
                 </Button>
@@ -736,29 +805,29 @@ export default function HomePage() {
 
         {/* Enhanced Links Management */}
         <Card className="max-w-7xl mx-auto shadow-xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardHeader className="pb-6">
-            <div className="flex items-center justify-between">
+          <CardHeader className="pb-4 sm:pb-6">
+            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
               <div className="flex items-center space-x-3">
-                <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                <div className="h-8 sm:h-10 w-8 sm:w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <BarChart3 className="h-4 sm:h-5 w-4 sm:w-5 text-indigo-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Your Short Links</CardTitle>
-                  <CardDescription className="text-base">
+                  <CardTitle className="text-xl sm:text-2xl">Your Short Links</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">
                     Manage and analyze your shortened URLs with advanced tracking
                   </CardDescription>
                 </div>
               </div>
               
               {/* Search and Filter Controls */}
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search links..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64 border-2 focus:border-blue-500 transition-colors"
+                    className="pl-10 w-full sm:w-64 border-2 focus:border-blue-500 transition-colors"
                   />
                 </div>
                 
@@ -770,10 +839,11 @@ export default function HomePage() {
                       setSortBy(sortBy === 'created_at' ? 'click_count' : 'created_at')
                       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')
                     }}
-                    className="flex items-center space-x-2"
+                    className="flex items-center space-x-2 text-xs sm:text-sm"
                   >
-                    <Filter className="h-4 w-4" />
-                    <span>{sortBy === 'created_at' ? 'Date' : 'Clicks'}</span>
+                    <Filter className="h-3 sm:h-4 w-3 sm:w-4" />
+                    <span className="hidden sm:inline">{sortBy === 'created_at' ? 'Date' : 'Clicks'}</span>
+                    <span className="sm:hidden">{sortBy === 'created_at' ? 'Date' : 'Clicks'}</span>
                     <span className="text-xs">{sortOrder === 'desc' ? '↓' : '↑'}</span>
                   </Button>
                   
@@ -781,7 +851,7 @@ export default function HomePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={fetchShortLinks}
+                    onClick={activeTab === 'active' ? fetchShortLinks : fetchDeletedLinks}
                     className="flex items-center space-x-2"
                     title="Refresh links"
                   >
@@ -791,23 +861,67 @@ export default function HomePage() {
               </div>
             </div>
           </CardHeader>
+
+          {/* Tabs */}
+          <div className="px-4 sm:px-6 pb-4">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+              <Button
+                variant={activeTab === 'active' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab('active')}
+                className={`flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm ${
+                  activeTab === 'active' 
+                    ? 'bg-white shadow-sm' 
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <Link2 className="h-3 sm:h-4 w-3 sm:w-4" />
+                <span className="hidden sm:inline">Active Links</span>
+                <span className="sm:hidden">Active</span>
+                <span className="bg-blue-100 text-blue-700 px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-medium">
+                  {shortLinks.length}
+                </span>
+              </Button>
+              
+              <Button
+                variant={activeTab === 'deleted' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActiveTab('deleted')}
+                className={`flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm ${
+                  activeTab === 'deleted' 
+                    ? 'bg-white shadow-sm' 
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <Trash2 className="h-3 sm:h-4 w-3 sm:w-4" />
+                <span className="hidden sm:inline">Deleted Links</span>
+                <span className="sm:hidden">Deleted</span>
+                <span className="bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-medium">
+                  {deletedLinks.length}
+                </span>
+              </Button>
+            </div>
+          </div>
           
           <CardContent>
-            {isLoadingLinks ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600 text-lg">Loading your links...</p>
-                <p className="text-gray-500 text-sm">This will just take a moment</p>
-              </div>
-            ) : filteredAndSortedLinks.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Link2 className="h-12 w-12 text-gray-400" />
+            {activeTab === 'active' ? (
+              // Active Links Tab
+              <>
+                {isLoadingLinks ? (
+                  <div className="text-center py-8 sm:py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto mb-3 sm:mb-4"></div>
+                    <p className="text-gray-600 text-base sm:text-lg">Loading your links...</p>
+                    <p className="text-gray-500 text-sm">This will just take a moment</p>
+                  </div>
+                ) : filteredAndSortedLinks.length === 0 ? (
+              <div className="text-center py-12 sm:py-16">
+                <div className="h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                  <Link2 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                   {searchTerm ? 'No links found' : 'No short links yet'}
                 </h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 max-w-md mx-auto px-4">
                   {searchTerm 
                     ? 'Try adjusting your search terms or create a new link above.'
                     : 'Create your first short link above to start tracking and analyzing your URLs.'
@@ -816,9 +930,9 @@ export default function HomePage() {
                 {!searchTerm && (
                   <Button 
                     onClick={() => document.getElementById('url-input')?.focus()}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-sm sm:text-base"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                     Create Your First Link
                   </Button>
                 )}
@@ -828,35 +942,35 @@ export default function HomePage() {
                 {filteredAndSortedLinks.map((link) => (
                   <div key={link.id} className="group">
                     <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                           {/* Link Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-start space-x-3 sm:space-x-4">
                               <div className="flex-shrink-0">
-                                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                  <Link2 className="h-6 w-6 text-blue-600" />
+                                <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                  <Link2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                                 </div>
                               </div>
                               
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-3 mb-2">
-                                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3 mb-2">
+                                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                                     {getShortUrl(link.slug)}
                                   </h3>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
                                     {link.slug}
                                   </span>
                                 </div>
                                 
-                                <p className="text-sm text-gray-600 truncate max-w-md">
+                                <p className="text-sm text-gray-600 truncate max-w-md mb-3 sm:mb-0">
                                   {link.original_url}
                                 </p>
                                 
-                                <div className="flex items-center space-x-4 mt-3">
+                                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
                                   {/* Enhanced Click Count Display */}
                                   <div className="flex items-center space-x-2">
-                                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                    <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${
                                       link.click_count === 0 
                                         ? 'bg-gray-100 text-gray-500' 
                                         : link.click_count < 10 
@@ -878,8 +992,8 @@ export default function HomePage() {
                                       </div>
                                     )}
                                   </div>
-                                  <div className="flex items-center space-x-1 text-sm text-gray-500">
-                                    <Clock className="h-4 w-4" />
+                                  <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
+                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
                                     <span>{formatDate(link.created_at)}</span>
                                   </div>
                                 </div>
@@ -888,25 +1002,25 @@ export default function HomePage() {
                           </div>
 
                           {/* Actions */}
-                          <div className="flex items-center space-x-2 ml-6">
+                          <div className="flex items-center justify-center space-x-2 sm:ml-6">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => copyToClipboard(getShortUrl(link.slug))}
-                              className="h-9 w-9 p-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
                               title="Copy link"
                             >
-                              <Copy className="h-4 w-4" />
+                              <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => window.open(link.original_url, '_blank')}
-                              className="h-9 w-9 p-0 hover:bg-green-50 hover:border-green-300 transition-colors"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-green-50 hover:border-green-300 transition-colors"
                               title="Visit original URL"
                             >
-                              <ExternalLink className="h-4 w-4" />
+                              <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             
                             <Button
@@ -921,14 +1035,14 @@ export default function HomePage() {
                                 }
                                 setExpandedAnalytics(newExpanded)
                               }}
-                              className={`h-9 w-9 p-0 transition-colors ${
+                              className={`h-8 w-8 sm:h-9 sm:w-9 p-0 transition-colors ${
                                 expandedAnalytics.has(link.id)
                                   ? 'bg-purple-50 border-purple-300 text-purple-600'
                                   : 'hover:bg-purple-50 hover:border-purple-300'
                               }`}
                               title={expandedAnalytics.has(link.id) ? "Hide analytics" : "Show analytics"}
                             >
-                              <BarChart3 className="h-4 w-4" />
+                              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                             
                             <Button
@@ -936,13 +1050,13 @@ export default function HomePage() {
                               size="sm"
                               onClick={() => deleteShortLink(link.id, link.slug)}
                               disabled={deletingLinkId === link.id}
-                              className="h-9 w-9 p-0 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
                               title="Delete link"
                             >
                               {deletingLinkId === link.id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-red-600"></div>
                               ) : (
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                               )}
                             </Button>
                             
@@ -952,7 +1066,7 @@ export default function HomePage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => testDeletion(link.id, link.slug)}
-                                className="h-9 w-9 p-0 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600 transition-colors"
+                                className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600 transition-colors"
                                 title="Test deletion (dev only)"
                               >
                                 🧪
@@ -972,18 +1086,106 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
+            ) : (
+              // Deleted Links Tab
+              <>
+                {isLoadingDeletedLinks ? (
+                  <div className="text-center py-8 sm:py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-red-600 mx-auto mb-3 sm:mb-4"></div>
+                    <p className="text-gray-600 text-base sm:text-lg">Loading deleted links...</p>
+                    <p className="text-gray-500 text-sm">This will just take a moment</p>
+                  </div>
+                ) : deletedLinks.length === 0 ? (
+                  <div className="text-center py-12 sm:py-16">
+                    <div className="h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                      <Trash2 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                      No deleted links
+                    </h3>
+                    <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 max-w-md mx-auto px-4">
+                      Deleted links will appear here. You can restore them if needed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {deletedLinks.map((link) => (
+                      <div key={link.id} className="group">
+                        <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-r from-gray-50 to-red-50/50">
+                          <CardContent className="p-4 sm:p-6">
+                            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                              {/* Link Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start space-x-3 sm:space-x-4">
+                                  <div className="flex-shrink-0">
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                      <Trash2 className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3 mb-2">
+                                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                                        {getShortUrl(link.slug)}
+                                      </h3>
+                                      <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-red-100 text-red-800 w-fit">
+                                        {link.slug}
+                                      </span>
+                                      <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 w-fit">
+                                        Deleted
+                                      </span>
+                                    </div>
+                                    
+                                    <p className="text-sm text-gray-600 truncate max-w-md mb-3 sm:mb-0">
+                                      {link.original_url}
+                                    </p>
+                                    
+                                    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+                                      <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
+                                        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        <span>{link.click_count} clicks</span>
+                                      </div>
+                                      <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        <span>Deleted {formatDate(link.deleted_at || link.created_at)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center justify-center space-x-2 sm:ml-6">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => restoreDeletedLink(link.id, link.slug)}
+                                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-green-50 hover:border-green-300 hover:text-green-600 transition-colors"
+                                  title="Restore link"
+                                >
+                                  <div className="h-3 w-3 sm:h-4 sm:w-4">🔄</div>
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
 
         {/* Enhanced Footer */}
-        <footer className="text-center mt-16 text-gray-500">
+        <footer className="text-center mt-12 sm:mt-16 text-gray-500">
           <div className="flex items-center justify-center space-x-2 mb-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
             <span className="text-sm font-medium">GoLinks</span>
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
           </div>
-          <p className="text-sm">Advanced URL shortening with global analytics</p>
+          <p className="text-xs sm:text-sm">Advanced URL shortening with global analytics</p>
         </footer>
       </div>
     </div>
