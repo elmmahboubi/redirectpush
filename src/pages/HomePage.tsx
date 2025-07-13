@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2, Calendar, TrendingDown, Activity } from 'lucide-react'
+import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2, Calendar, TrendingDown, Activity, Lock, User, Shield } from 'lucide-react'
 import { supabase, type ShortLink } from '@/lib/supabase'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
@@ -15,6 +15,11 @@ interface ClickStats {
   last7Days: number
   last30Days: number
   total: number
+}
+
+interface LoginCredentials {
+  username: string
+  password: string
 }
 
 export default function HomePage() {
@@ -35,21 +40,68 @@ export default function HomePage() {
     total: 0
   })
   const [isLoadingStats, setIsLoadingStats] = useState(true)
+  
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
+  const [loginCredentials, setLoginCredentials] = useState<LoginCredentials>({
+    username: '',
+    password: ''
+  })
 
-  // Add error logging
-  console.log('HomePage component rendering...')
+  // Superuser credentials
+  const SUPERUSER_CREDENTIALS = {
+    username: 'elmahboubi',
+    password: 'Localserver!!2'
+  }
+
+  // Check authentication on mount
+  useEffect(() => {
+    const authStatus = localStorage.getItem('golinks_authenticated')
+    if (authStatus === 'true') {
+      setIsAuthenticated(true)
+    }
+    setIsLoadingAuth(false)
+  }, [])
 
   // Fetch all short links on component mount
   useEffect(() => {
-    console.log('HomePage useEffect - fetching links...')
-    fetchShortLinks()
-    fetchClickStats()
-  }, [])
+    if (isAuthenticated) {
+      console.log('HomePage useEffect - fetching links...')
+      fetchShortLinks()
+      fetchClickStats()
+    }
+  }, [isAuthenticated])
 
   // Update document title
   useEffect(() => {
     document.title = 'GoLinks - Advanced URL Shortener with Analytics'
   }, [])
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoadingAuth(true)
+    
+    // Simulate loading
+    setTimeout(() => {
+      if (loginCredentials.username === SUPERUSER_CREDENTIALS.username && 
+          loginCredentials.password === SUPERUSER_CREDENTIALS.password) {
+        setIsAuthenticated(true)
+        localStorage.setItem('golinks_authenticated', 'true')
+        toast.success('Welcome back, Superuser!')
+      } else {
+        toast.error('Invalid credentials. Access denied.')
+        setLoginCredentials({ username: '', password: '' })
+      }
+      setIsLoadingAuth(false)
+    }, 1000)
+  }
+
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    localStorage.removeItem('golinks_authenticated')
+    toast.success('Logged out successfully')
+  }
 
   const fetchClickStats = async () => {
     setIsLoadingStats(true)
@@ -339,6 +391,96 @@ export default function HomePage() {
     { click_count: 0, slug: '', original_url: '', id: '', created_at: '' }
   )
 
+  // Show loading screen while checking authentication
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Initializing GoLinks...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="w-full max-w-md">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="text-center pb-6">
+              <div className="flex items-center justify-center mb-4">
+                <img 
+                  src="/golinks-logo.svg" 
+                  alt="GoLinks" 
+                  className="h-16 w-auto"
+                />
+              </div>
+              <CardTitle className="text-2xl font-bold text-gray-900">GoLinks Admin</CardTitle>
+              <CardDescription className="text-gray-600">
+                Superuser authentication required
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Username</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="Enter username"
+                      value={loginCredentials.username}
+                      onChange={(e) => setLoginCredentials(prev => ({ ...prev, username: e.target.value }))}
+                      className="pl-10 h-12 border-2 focus:border-blue-500 transition-colors"
+                      disabled={isLoadingAuth}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="password"
+                      placeholder="Enter password"
+                      value={loginCredentials.password}
+                      onChange={(e) => setLoginCredentials(prev => ({ ...prev, password: e.target.value }))}
+                      className="pl-10 h-12 border-2 focus:border-blue-500 transition-colors"
+                      disabled={isLoadingAuth}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <Button
+                  type="submit"
+                  disabled={isLoadingAuth || !loginCredentials.username || !loginCredentials.password}
+                  className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+                >
+                  {isLoadingAuth ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Authenticating...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Shield className="h-4 w-4" />
+                      <span>Login</span>
+                    </div>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto px-4 py-8">
@@ -363,9 +505,26 @@ export default function HomePage() {
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-4">
             Transform long URLs into short, shareable links with advanced analytics and global reach tracking
           </p>
+          
+          {/* User Info and Logout */}
+          <div className="flex items-center justify-center space-x-4">
+            <div className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm">
+              <Shield className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-gray-700">Superuser: {SUPERUSER_CREDENTIALS.username}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="flex items-center space-x-2 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
+            >
+              <Lock className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </div>
         </div>
 
         {/* Environment Check for Testing */}
