@@ -7,6 +7,7 @@ import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizon
 import { supabase, type ShortLink } from '@/lib/supabase'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
+import EnvironmentCheck from '@/components/EnvironmentCheck'
 
 export default function HomePage() {
   const [originalUrl, setOriginalUrl] = useState('')
@@ -180,6 +181,9 @@ export default function HomePage() {
             Transform long URLs into short, shareable links with advanced analytics and global reach tracking
           </p>
         </div>
+
+        {/* Environment Check for Testing */}
+        <EnvironmentCheck />
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

@@ -8,7 +8,7 @@
     - `short_link_id` (uuid, foreign key to short_links)
     - `referrer` (text) - The website where the click came from
     - `user_agent` (text) - Browser/device info
-    - `ip_address` (inet) - IP address (optional, for analytics)
+    - `ip_address` (inet) - IP address (for analytics)
     - `country` (text) - Country where the click originated
     - `country_code` (text) - ISO country code (e.g., US, GB, FR)
     - `city` (text) - City where the click originated (optional)
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS referrer_clicks (
   short_link_id uuid REFERENCES short_links(id) ON DELETE CASCADE,
   referrer text, -- The website where the click came from
   user_agent text, -- Browser/device info
-  ip_address inet, -- IP address (optional, for analytics)
+  ip_address inet, -- IP address (for analytics)
   country text, -- Country where the click originated
   country_code text, -- ISO country code (e.g., US, GB, FR)
   city text, -- City where the click originated (optional)
@@ -48,7 +48,11 @@ CREATE POLICY "Public read referrer clicks"
   TO anon
   USING (true);
 
--- Create index for referrer clicks lookups
+-- Create comprehensive indexes for analytics
 CREATE INDEX IF NOT EXISTS idx_referrer_clicks_short_link_id ON referrer_clicks(short_link_id);
 CREATE INDEX IF NOT EXISTS idx_referrer_clicks_clicked_at ON referrer_clicks(clicked_at);
-CREATE INDEX IF NOT EXISTS idx_referrer_clicks_country ON referrer_clicks(country); 
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_country ON referrer_clicks(country);
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_country_code ON referrer_clicks(country_code);
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_city ON referrer_clicks(city);
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_ip_address ON referrer_clicks(ip_address);
+CREATE INDEX IF NOT EXISTS idx_referrer_clicks_referrer ON referrer_clicks(referrer); 

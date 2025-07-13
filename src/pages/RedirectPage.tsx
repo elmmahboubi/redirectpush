@@ -11,7 +11,7 @@ export default function RedirectPage() {
       if (!slug) return
 
       // Set a maximum time to wait for database operations
-      const MAX_WAIT_TIME = 3000 // 3 seconds
+      const MAX_WAIT_TIME = 5000 // 5 seconds
       const startTime = Date.now()
 
       try {
@@ -31,25 +31,39 @@ export default function RedirectPage() {
         const referrer = document.referrer || null
         const userAgent = navigator.userAgent || null
 
-        // Record the click with referrer information immediately (non-blocking)
+        // Get geolocation data FIRST (this is critical for proper tracking)
+        console.log('Getting geolocation data before recording click...')
+        const geoData = await getGeolocationWithTimeout(4000) // 4 second timeout for robust detection
+        
+        if (geoData) {
+          console.log('Geolocation data received:', geoData)
+        } else {
+          console.warn('No geolocation data received, will record with null values')
+        }
+
+        // Record the click with COMPLETE data including geolocation
         const recordClick = async () => {
           try {
+            const clickData = {
+              short_link_id: shortLink.id,
+              referrer: referrer,
+              user_agent: userAgent,
+              ip_address: geoData?.ip_address || null,
+              country: geoData?.country || null,
+              country_code: geoData?.country_code || null,
+              city: geoData?.city || null
+            }
+
+            console.log('Recording click with data:', clickData)
+
             const { error: referrerError } = await supabase
               .from('referrer_clicks')
-              .insert({
-                short_link_id: shortLink.id,
-                referrer: referrer,
-                user_agent: userAgent,
-                ip_address: null,
-                country: null,
-                country_code: null,
-                city: null
-              })
+              .insert(clickData)
 
             if (referrerError) {
               console.error('Failed to record referrer click:', referrerError)
             } else {
-              console.log(`Referrer click recorded for slug: ${slug}`, { referrer })
+              console.log(`Click recorded successfully for slug: ${slug}`, clickData)
             }
           } catch (error) {
             console.error('Error recording click:', error)
@@ -69,56 +83,31 @@ export default function RedirectPage() {
           }
         }
 
-        // Get geolocation data and update record (non-blocking)
-        const updateGeolocation = async () => {
-          try {
-            const geoData = await getGeolocationWithTimeout(4000) // 4 second timeout for robust detection
-            if (geoData) {
-              console.log('Geolocation data received:', geoData)
-              
-              // Update the most recent click record with geolocation data
-              const { error: updateError } = await supabase
-                .from('referrer_clicks')
-                .update({
-                  country: geoData.country,
-                  country_code: geoData.country_code,
-                  city: geoData.city
-                })
-                .eq('short_link_id', shortLink.id)
-                .eq('referrer', referrer)
-                .order('clicked_at', { ascending: false })
-                .limit(1)
-
-              if (updateError) {
-                console.error('Failed to update geolocation data:', updateError)
-              } else {
-                console.log('Geolocation data updated successfully:', geoData)
-              }
-            } else {
-              console.warn('No geolocation data received')
-            }
-          } catch (error) {
-            console.warn('Geolocation failed:', error)
-          }
-        }
-
-        // Start all analytics operations in parallel (non-blocking)
-        Promise.allSettled([
+        // Execute both operations in parallel
+        await Promise.allSettled([
           recordClick(),
-          updateClickCount(),
-          updateGeolocation()
-        ]).catch(() => {
-          // Ignore any errors in analytics - don't affect redirect
-          console.warn('Some analytics operations failed, but redirect will continue')
-        })
+          updateClickCount()
+        ])
 
-        // Redirect immediately - don't wait for analytics
+        // Redirect after recording is complete
+        console.log('Redirecting to:', shortLink.original_url)
         window.location.href = shortLink.original_url
+
       } catch (error) {
         console.error('Redirect error:', error)
         // Even if there's an error, try to redirect if we have the URL
-        if (shortLink?.original_url) {
-          window.location.href = shortLink.original_url
+        try {
+          const { data: shortLink } = await supabase
+            .from('short_links')
+            .select('original_url')
+            .eq('slug', slug)
+            .single()
+          
+          if (shortLink?.original_url) {
+            window.location.href = shortLink.original_url
+          }
+        } catch (fallbackError) {
+          console.error('Fallback redirect failed:', fallbackError)
         }
       }
     }
@@ -126,9 +115,9 @@ export default function RedirectPage() {
     // Add a timeout fallback to ensure redirect always happens
     const redirectTimeout = setTimeout(() => {
       console.warn('Redirect timeout reached - forcing redirect')
-      // If we haven't redirected after 3 seconds, force it
+      // If we haven't redirected after 5 seconds, force it
       window.location.href = `https://${window.location.host}/${slug}`
-    }, 3000)
+    }, 5000)
 
     handleRedirect().finally(() => {
       clearTimeout(redirectTimeout)
@@ -141,6 +130,7 @@ export default function RedirectPage() {
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-600 text-lg">Redirecting...</p>
+        <p className="text-gray-400 text-sm mt-2">Tracking your location for analytics</p>
       </div>
     </div>
   )

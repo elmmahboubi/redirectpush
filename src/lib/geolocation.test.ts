@@ -1,22 +1,25 @@
-// Simple test for geolocation service
-import { getGeolocationFromIP, getGeolocationWithTimeout } from './geolocation'
+// Test file for geolocation functionality
+import { getGeolocationWithTimeout, testGeolocation } from './geolocation'
 
-// Test the geolocation service
-export const testGeolocation = async () => {
-  console.log('Testing geolocation service...')
+// Test function to verify geolocation is working
+export const testGeolocationFunction = async () => {
+  console.log('🧪 Testing geolocation functionality...')
   
   try {
-    const geoData = await getGeolocationWithTimeout(5000)
+    const result = await getGeolocationWithTimeout(10000)
     
-    if (geoData) {
-      console.log('✅ Geolocation test successful:', {
-        country: geoData.country,
-        country_code: geoData.country_code,
-        city: geoData.city
+    if (result) {
+      console.log('✅ Geolocation test successful!')
+      console.log('📍 Location data:', {
+        country: result.country,
+        country_code: result.country_code,
+        city: result.city,
+        ip_address: result.ip_address,
+        isProxy: result.isProxy
       })
-      return geoData
+      return result
     } else {
-      console.log('❌ Geolocation test failed: No data returned')
+      console.log('❌ Geolocation test failed - no data returned')
       return null
     }
   } catch (error) {
@@ -25,8 +28,8 @@ export const testGeolocation = async () => {
   }
 }
 
-// Run test if this file is executed directly
+// Function to test from browser console
 if (typeof window !== 'undefined') {
-  // Browser environment - can be called from console
-  (window as any).testGeolocation = testGeolocation
+  (window as any).testGeolocation = testGeolocationFunction
+  console.log('🌍 Geolocation test available: window.testGeolocation()')
 } 
