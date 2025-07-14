@@ -54,7 +54,13 @@ Create a `.env.local` file in the root directory:
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_BASE_URL=https://your-domain.com
+
+# SECURITY: Superuser Authentication (REQUIRED)
+VITE_SUPERUSER_USERNAME=your_secure_username
+VITE_SUPERUSER_PASSWORD=your_secure_password
 ```
+
+**⚠️ SECURITY WARNING**: Never commit your `.env.local` file to version control. The superuser credentials are used for admin access to the application.
 
 ### 4. Local Development
 
@@ -94,6 +100,10 @@ Add the same environment variables in your Vercel project settings:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_BASE_URL`
+- `VITE_SUPERUSER_USERNAME` (REQUIRED for admin access)
+- `VITE_SUPERUSER_PASSWORD` (REQUIRED for admin access)
+
+**⚠️ SECURITY**: Make sure to set strong, unique credentials for the superuser authentication in your Vercel environment variables.
 
 ## 📊 Database Schema
 
@@ -131,6 +141,9 @@ CREATE TABLE referrer_clicks (
 - **Public Access**: Configured for anonymous link creation and access
 - **Input Validation**: URL validation on both client side
 - **Error Handling**: Comprehensive error handling throughout the app
+- **Environment-based Authentication**: Superuser credentials stored in environment variables, not in source code
+- **Session Management**: Secure localStorage-based session persistence
+- **Input Sanitization**: All user inputs are validated and sanitized
 
 ## 📱 How It Works
 

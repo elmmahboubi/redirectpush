@@ -44,6 +44,14 @@ export default function HomePage() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
+
+  // DEBUG: Log loaded superuser credentials
+  const superuserUsername = import.meta.env.VITE_SUPERUSER_USERNAME
+  const superuserPassword = import.meta.env.VITE_SUPERUSER_PASSWORD
+  console.log('Loaded superuser credentials:', {
+    superuserUsername,
+    superuserPassword
+  })
   const [loginCredentials, setLoginCredentials] = useState<LoginCredentials>({
     username: '',
     password: ''
@@ -54,10 +62,10 @@ export default function HomePage() {
   const [deletedLinks, setDeletedLinks] = useState<ShortLink[]>([])
   const [isLoadingDeletedLinks, setIsLoadingDeletedLinks] = useState(false)
 
-  // Superuser credentials
+  // Superuser credentials - moved to environment variables for security
   const SUPERUSER_CREDENTIALS = {
-    username: 'elmahboubi',
-    password: 'Localserver!!2'
+    username: import.meta.env.VITE_SUPERUSER_USERNAME || 'admin',
+    password: import.meta.env.VITE_SUPERUSER_PASSWORD || 'admin'
   }
 
   // Check authentication on mount

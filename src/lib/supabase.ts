@@ -24,6 +24,8 @@ export type ShortLink = {
   original_url: string
   click_count: number
   created_at: string
+  deleted?: boolean
+  deleted_at?: string | null
 }
 
 export type ReferrerClick = {
