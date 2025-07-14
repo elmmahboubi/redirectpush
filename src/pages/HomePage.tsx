@@ -135,10 +135,6 @@ export default function HomePage() {
   }
 
   const restoreDeletedLink = async (linkId: string, slug: string) => {
-    if (!confirm(`Are you sure you want to restore the link "${slug}"?`)) {
-      return
-    }
-
     try {
       const { error } = await supabase
         .from('short_links')
@@ -152,8 +148,13 @@ export default function HomePage() {
 
       toast.success('Link restored successfully!')
       
-      // Refresh both active and deleted links
-      await Promise.all([fetchShortLinks(), fetchDeletedLinks()])
+      // Remove from deleted links state immediately
+      setDeletedLinks(prevDeleted => prevDeleted.filter(link => link.id !== linkId))
+      
+      // Refresh data in background to ensure consistency
+      Promise.all([fetchShortLinks(), fetchDeletedLinks()]).catch(error => {
+        console.error('Background refresh error:', error)
+      })
     } catch (error) {
       console.error('Error restoring link:', error)
       toast.error('Failed to restore link')
@@ -354,11 +355,6 @@ export default function HomePage() {
   }
 
   const deleteShortLink = async (linkId: string, slug: string) => {
-    // Confirm deletion
-    if (!confirm(`Are you sure you want to delete the link "${slug}"? This action cannot be undone.`)) {
-      return
-    }
-
     setDeletingLinkId(linkId)
     
     try {
@@ -443,20 +439,32 @@ export default function HomePage() {
 
       console.log('✅ Link soft deletion verified successfully:', verifyData)
 
-      // Step 4: Update UI immediately for better UX
+      // Step 4: Update UI immediately for instant feedback
       toast.success(`Link "${slug}" moved to deleted links!`)
       
       // Remove from active links state immediately
       setShortLinks(prevLinks => prevLinks.filter(link => link.id !== linkId))
       
-      // Refresh data to ensure consistency
-      await Promise.all([
+      // Add to deleted links state immediately if on deleted tab
+      if (activeTab === 'deleted') {
+        const deletedLink: ShortLink = {
+          ...existingLink,
+          deleted: true,
+          deleted_at: new Date().toISOString()
+        } as ShortLink
+        setDeletedLinks(prevDeleted => [deletedLink, ...prevDeleted])
+      }
+      
+      // Refresh data in background to ensure consistency
+      Promise.all([
         fetchShortLinks(),
         fetchClickStats(),
         activeTab === 'deleted' ? fetchDeletedLinks() : Promise.resolve()
-      ])
+      ]).catch(error => {
+        console.error('Background refresh error:', error)
+      })
 
-      console.log('🔄 UI updated and data refreshed successfully')
+      console.log('🔄 UI updated instantly and background refresh started')
 
     } catch (error) {
       console.error('❌ Error deleting link:', error)
