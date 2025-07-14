@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getGeolocationWithTimeout } from '@/lib/geolocation'
+import NotFoundPage from './NotFoundPage'
 
 export default function RedirectPage() {
   const { slug } = useParams<{ slug: string }>()
   const [destinationTitle, setDestinationTitle] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isDeletedLink, setIsDeletedLink] = useState(false)
 
   useEffect(() => {
     const handleRedirect = async () => {
@@ -26,14 +28,15 @@ export default function RedirectPage() {
 
         if (error || !shortLink) {
           console.log(`Slug not found: ${slug}`)
+          setIsLoading(false)
           return
         }
 
         // Check if the link is deleted
         if (shortLink.deleted) {
           console.log(`Link is deleted: ${slug} (deleted at: ${shortLink.deleted_at})`)
-          // Don't redirect, just show an error or redirect to 404
-          window.location.href = '/404'
+          setIsDeletedLink(true)
+          setIsLoading(false)
           return
         }
 
@@ -143,10 +146,12 @@ export default function RedirectPage() {
             window.location.href = shortLink.original_url
           } else if (shortLink?.deleted) {
             console.log(`Fallback: Link is deleted: ${slug}`)
-            window.location.href = '/404'
+            setIsDeletedLink(true)
+            setIsLoading(false)
           }
         } catch (fallbackError) {
           console.error('Fallback redirect failed:', fallbackError)
+          setIsLoading(false)
         }
       }
     }
@@ -162,6 +167,11 @@ export default function RedirectPage() {
       clearTimeout(redirectTimeout)
     })
   }, [slug])
+
+  // If it's a deleted link, show the NotFoundPage
+  if (isDeletedLink) {
+    return <NotFoundPage slug={slug} />
+  }
 
   // Show loading state while redirecting
   return (

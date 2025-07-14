@@ -5,11 +5,18 @@ import { AlertTriangle, Home, Trash2, MessageCircle, ExternalLink } from 'lucide
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
-export default function NotFoundPage() {
-  const { slug } = useParams<{ slug: string }>()
+interface NotFoundPageProps {
+  slug?: string
+}
+
+export default function NotFoundPage({ slug: propSlug }: NotFoundPageProps = {}) {
+  const { slug: paramSlug } = useParams<{ slug: string }>()
   const location = useLocation()
   const [isDeletedLink, setIsDeletedLink] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Use prop slug if provided, otherwise use URL param
+  const slug = propSlug || paramSlug
 
   useEffect(() => {
     const checkIfDeleted = async () => {
