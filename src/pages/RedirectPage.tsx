@@ -20,12 +20,20 @@ export default function RedirectPage() {
         // Look up the short link in the database
         const { data: shortLink, error } = await supabase
           .from('short_links')
-          .select('id, original_url, click_count')
+          .select('id, original_url, click_count, deleted, deleted_at')
           .eq('slug', slug)
           .single()
 
         if (error || !shortLink) {
           console.log(`Slug not found: ${slug}`)
+          return
+        }
+
+        // Check if the link is deleted
+        if (shortLink.deleted) {
+          console.log(`Link is deleted: ${slug} (deleted at: ${shortLink.deleted_at})`)
+          // Don't redirect, just show an error or redirect to 404
+          window.location.href = '/404'
           return
         }
 
@@ -127,12 +135,15 @@ export default function RedirectPage() {
         try {
           const { data: shortLink } = await supabase
             .from('short_links')
-            .select('original_url')
+            .select('original_url, deleted')
             .eq('slug', slug)
             .single()
           
-          if (shortLink?.original_url) {
+          if (shortLink?.original_url && !shortLink.deleted) {
             window.location.href = shortLink.original_url
+          } else if (shortLink?.deleted) {
+            console.log(`Fallback: Link is deleted: ${slug}`)
+            window.location.href = '/404'
           }
         } catch (fallbackError) {
           console.error('Fallback redirect failed:', fallbackError)
