@@ -1109,7 +1109,6 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-            )
             ) : (
               // Deleted Links Tab
               <>
