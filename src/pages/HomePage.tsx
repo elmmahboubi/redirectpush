@@ -50,7 +50,9 @@ export default function HomePage() {
   const superuserPassword = import.meta.env.VITE_SUPERUSER_PASSWORD
   console.log('Loaded superuser credentials:', {
     superuserUsername,
-    superuserPassword
+    superuserPassword,
+    superuserUsernameType: typeof superuserUsername,
+    superuserPasswordType: typeof superuserPassword
   })
   const [loginCredentials, setLoginCredentials] = useState<LoginCredentials>({
     username: '',
