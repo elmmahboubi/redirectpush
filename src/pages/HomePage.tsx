@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Copy, ExternalLink, Link2, BarChart3, Plus, Search, Filter, MoreHorizontal, TrendingUp, Eye, Clock, Globe, Trash2, Calendar, TrendingDown, Activity, Lock, User, Shield } from 'lucide-react'
 import { supabase, type ShortLink } from '@/lib/supabase'
+import { authenticateUser, type User as AuthUser } from '@/lib/auth'
 import { toast } from 'sonner'
 import ReferrerAnalytics from '@/components/ReferrerAnalytics'
 import EnvironmentCheck from '@/components/EnvironmentCheck'
@@ -44,16 +45,7 @@ export default function HomePage() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
-
-  // DEBUG: Log loaded superuser credentials
-  const superuserUsername = import.meta.env.VITE_SUPERUSER_USERNAME
-  const superuserPassword = import.meta.env.VITE_SUPERUSER_PASSWORD
-  console.log('Loaded superuser credentials:', {
-    superuserUsername,
-    superuserPassword,
-    superuserUsernameType: typeof superuserUsername,
-    superuserPasswordType: typeof superuserPassword
-  })
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [loginCredentials, setLoginCredentials] = useState<LoginCredentials>({
     username: '',
     password: ''
@@ -64,17 +56,21 @@ export default function HomePage() {
   const [deletedLinks, setDeletedLinks] = useState<ShortLink[]>([])
   const [isLoadingDeletedLinks, setIsLoadingDeletedLinks] = useState(false)
 
-  // Superuser credentials - moved to environment variables for security
-  const SUPERUSER_CREDENTIALS = {
-    username: import.meta.env.VITE_SUPERUSER_USERNAME || 'admin',
-    password: import.meta.env.VITE_SUPERUSER_PASSWORD || 'admin'
-  }
-
   // Check authentication on mount
   useEffect(() => {
     const authStatus = localStorage.getItem('golinks_authenticated')
-    if (authStatus === 'true') {
-      setIsAuthenticated(true)
+    const userData = localStorage.getItem('golinks_user')
+    
+    if (authStatus === 'true' && userData) {
+      try {
+        const user = JSON.parse(userData) as AuthUser
+        setIsAuthenticated(true)
+        setCurrentUser(user)
+      } catch (error) {
+        console.error('❌ Error parsing user data:', error)
+        localStorage.removeItem('golinks_authenticated')
+        localStorage.removeItem('golinks_user')
+      }
     }
     setIsLoadingAuth(false)
   }, [])
@@ -101,38 +97,40 @@ export default function HomePage() {
     document.title = 'GoLinks - Advanced URL Shortener with Analytics'
   }, [])
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoadingAuth(true)
     
-    // DEBUG: Log the comparison values
-    console.log('🔐 Login attempt:', {
-      enteredUsername: loginCredentials.username,
-      enteredPassword: loginCredentials.password,
-      expectedUsername: SUPERUSER_CREDENTIALS.username,
-      expectedPassword: SUPERUSER_CREDENTIALS.password,
-      usernameMatch: loginCredentials.username === SUPERUSER_CREDENTIALS.username,
-      passwordMatch: loginCredentials.password === SUPERUSER_CREDENTIALS.password
-    })
-    
-    // Simulate loading
-    setTimeout(() => {
-      if (loginCredentials.username === SUPERUSER_CREDENTIALS.username && 
-          loginCredentials.password === SUPERUSER_CREDENTIALS.password) {
+    try {
+      console.log('🔐 Attempting authentication for:', loginCredentials.username)
+      
+      // Authenticate against database
+      const user = await authenticateUser(loginCredentials.username, loginCredentials.password)
+      
+      if (user) {
         setIsAuthenticated(true)
+        setCurrentUser(user)
         localStorage.setItem('golinks_authenticated', 'true')
-        toast.success('Welcome back, Superuser!')
+        localStorage.setItem('golinks_user', JSON.stringify(user))
+        toast.success(`Welcome back, ${user.username}!`)
       } else {
         toast.error('Invalid credentials. Access denied.')
         setLoginCredentials({ username: '', password: '' })
       }
+    } catch (error) {
+      console.error('❌ Login error:', error)
+      toast.error('Authentication failed. Please try again.')
+      setLoginCredentials({ username: '', password: '' })
+    } finally {
       setIsLoadingAuth(false)
-    }, 1000)
+    }
   }
 
   const handleLogout = () => {
     setIsAuthenticated(false)
+    setCurrentUser(null)
     localStorage.removeItem('golinks_authenticated')
+    localStorage.removeItem('golinks_user')
     toast.success('Logged out successfully')
   }
 
@@ -622,7 +620,7 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
             <div className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm px-3 sm:px-4 py-2 rounded-full shadow-sm">
               <Shield className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-gray-700">Superuser: {SUPERUSER_CREDENTIALS.username}</span>
+                              <span className="text-sm font-medium text-gray-700">Database Authentication</span>
             </div>
             <Button
               variant="outline"
