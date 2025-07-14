@@ -182,9 +182,10 @@ export default function HomePage() {
       const { data: totalData } = await supabase
         .from('short_links')
         .select('click_count')
-        .eq('deleted', false)
 
-      const totalClicks = totalData?.reduce((sum, link) => sum + link.click_count, 0) || 0
+      // Filter active links on the client side
+      const activeLinksData = totalData?.filter(link => link.deleted !== true) || []
+      const totalClicks = activeLinksData.reduce((sum, link) => sum + link.click_count, 0) || 0
 
       setClickStats({
         today: todayClicks,
@@ -206,7 +207,6 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from('short_links')
         .select('*')
-        .eq('deleted', false)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -214,8 +214,11 @@ export default function HomePage() {
         throw error
       }
       
-      console.log('Fetched links:', data?.length || 0)
-      setShortLinks(data || [])
+      // Filter active links on the client side
+      const activeLinksData = data?.filter(link => link.deleted !== true) || []
+      
+      console.log('Fetched links:', activeLinksData.length)
+      setShortLinks(activeLinksData)
     } catch (error) {
       console.error('Error fetching links:', error)
       toast.error('Failed to load links')
@@ -228,22 +231,27 @@ export default function HomePage() {
     setIsLoadingDeletedLinks(true)
     try {
       console.log('🔍 Fetching deleted links from Supabase...')
+      
+      // First try to fetch all links and filter on the client side
+      // This works around potential RLS policy issues
       const { data, error } = await supabase
         .from('short_links')
         .select('*')
-        .eq('deleted', true)
-        .order('deleted_at', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('❌ Supabase error:', error)
         throw error
       }
       
-      console.log('✅ Fetched deleted links:', data?.length || 0)
-      if (data && data.length > 0) {
-        console.log('📋 Deleted links:', data.map(link => ({ id: link.id, slug: link.slug, deleted_at: link.deleted_at })))
+      // Filter deleted links on the client side
+      const deletedLinksData = data?.filter(link => link.deleted === true) || []
+      
+      console.log('✅ Fetched deleted links:', deletedLinksData.length)
+      if (deletedLinksData.length > 0) {
+        console.log('📋 Deleted links:', deletedLinksData.map(link => ({ id: link.id, slug: link.slug, deleted_at: link.deleted_at })))
       }
-      setDeletedLinks(data || [])
+      setDeletedLinks(deletedLinksData)
     } catch (error) {
       console.error('❌ Error fetching deleted links:', error)
       toast.error('Failed to load deleted links')
@@ -272,12 +280,14 @@ export default function HomePage() {
 
     try {
       // Get the next available slug number (only from active links)
-      const { data: lastLink } = await supabase
+      const { data: allLinks } = await supabase
         .from('short_links')
         .select('slug')
-        .eq('deleted', false)
         .order('created_at', { ascending: false })
-        .limit(1)
+
+      // Filter active links on the client side
+      const activeLinks = allLinks?.filter(link => link.deleted !== true) || []
+      const lastLink = activeLinks.length > 0 ? [activeLinks[0]] : []
 
       // Generate next slug (p1, p2, p3, etc.)
       let nextNumber = 1
