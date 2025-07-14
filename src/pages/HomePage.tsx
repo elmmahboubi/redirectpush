@@ -103,6 +103,16 @@ export default function HomePage() {
     e.preventDefault()
     setIsLoadingAuth(true)
     
+    // DEBUG: Log the comparison values
+    console.log('🔐 Login attempt:', {
+      enteredUsername: loginCredentials.username,
+      enteredPassword: loginCredentials.password,
+      expectedUsername: SUPERUSER_CREDENTIALS.username,
+      expectedPassword: SUPERUSER_CREDENTIALS.password,
+      usernameMatch: loginCredentials.username === SUPERUSER_CREDENTIALS.username,
+      passwordMatch: loginCredentials.password === SUPERUSER_CREDENTIALS.password
+    })
+    
     // Simulate loading
     setTimeout(() => {
       if (loginCredentials.username === SUPERUSER_CREDENTIALS.username && 
