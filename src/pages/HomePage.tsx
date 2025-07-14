@@ -937,178 +937,180 @@ export default function HomePage() {
                     <p className="text-gray-500 text-sm">This will just take a moment</p>
                   </div>
                 ) : filteredAndSortedLinks.length === 0 ? (
-              <div className="text-center py-12 sm:py-16">
-                <div className="h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                  <Link2 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
-                  {searchTerm ? 'No links found' : 'No short links yet'}
-                </h3>
-                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 max-w-md mx-auto px-4">
-                  {searchTerm 
-                    ? 'Try adjusting your search terms or create a new link above.'
-                    : 'Create your first short link above to start tracking and analyzing your URLs.'
-                  }
-                </p>
-                {!searchTerm && (
-                  <Button 
-                    onClick={() => document.getElementById('url-input')?.focus()}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-sm sm:text-base"
-                  >
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                    Create Your First Link
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredAndSortedLinks.map((link) => (
-                  <div key={link.id} className="group">
-                    <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
-                      <CardContent className="p-4 sm:p-6">
-                        <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                          {/* Link Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start space-x-3 sm:space-x-4">
-                              <div className="flex-shrink-0">
-                                <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                  <Link2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                                </div>
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3 mb-2">
-                                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-                                    {getShortUrl(link.slug)}
-                                  </h3>
-                                  <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
-                                    {link.slug}
-                                  </span>
-                                </div>
-                                
-                                <p className="text-sm text-gray-600 truncate max-w-md mb-3 sm:mb-0">
-                                  {link.original_url}
-                                </p>
-                                
-                                <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
-                                  {/* Enhanced Click Count Display */}
-                                  <div className="flex items-center space-x-2">
-                                    <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${
-                                      link.click_count === 0 
-                                        ? 'bg-gray-100 text-gray-500' 
-                                        : link.click_count < 10 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : link.click_count < 50 
-                                        ? 'bg-blue-100 text-blue-700' 
-                                        : link.click_count < 100 
-                                        ? 'bg-purple-100 text-purple-700' 
-                                        : 'bg-orange-100 text-orange-700'
-                                    }`}>
-                                      <Eye className="h-3 w-3 inline mr-1" />
-                                      {link.click_count} {link.click_count === 1 ? 'click' : 'clicks'}
-                                    </div>
-                                    {link.click_count > 0 && (
-                                      <div className="text-xs text-gray-400">
-                                        {link.click_count < 10 ? '🆕' : 
-                                         link.click_count < 50 ? '🔥' : 
-                                         link.click_count < 100 ? '⚡' : '🚀'}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
-                                    <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                                    <span>{formatDate(link.created_at)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center justify-center space-x-2 sm:ml-6">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => copyToClipboard(getShortUrl(link.slug))}
-                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                              title="Copy link"
-                            >
-                              <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => window.open(link.original_url, '_blank')}
-                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-green-50 hover:border-green-300 transition-colors"
-                              title="Visit original URL"
-                            >
-                              <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const newExpanded = new Set(expandedAnalytics)
-                                if (newExpanded.has(link.id)) {
-                                  newExpanded.delete(link.id)
-                                } else {
-                                  newExpanded.add(link.id)
-                                }
-                                setExpandedAnalytics(newExpanded)
-                              }}
-                              className={`h-8 w-8 sm:h-9 sm:w-9 p-0 transition-colors ${
-                                expandedAnalytics.has(link.id)
-                                  ? 'bg-purple-50 border-purple-300 text-purple-600'
-                                  : 'hover:bg-purple-50 hover:border-purple-300'
-                              }`}
-                              title={expandedAnalytics.has(link.id) ? "Hide analytics" : "Show analytics"}
-                            >
-                              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteShortLink(link.id, link.slug)}
-                              disabled={deletingLinkId === link.id}
-                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
-                              title="Delete link"
-                            >
-                              {deletingLinkId === link.id ? (
-                                <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-red-600"></div>
-                              ) : (
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              )}
-                            </Button>
-                            
-                            {/* Debug button - only in development */}
-                            {import.meta.env.DEV && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => testDeletion(link.id, link.slug)}
-                                className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600 transition-colors"
-                                title="Test deletion (dev only)"
-                              >
-                                🧪
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    {/* Analytics Section */}
-                    {expandedAnalytics.has(link.id) && (
-                      <div className="mt-4 ml-6">
-                        <ReferrerAnalytics shortLinkId={link.id} slug={link.slug} />
-                      </div>
+                  <div className="text-center py-12 sm:py-16">
+                    <div className="h-16 w-16 sm:h-24 sm:w-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                      <Link2 className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                      {searchTerm ? 'No links found' : 'No short links yet'}
+                    </h3>
+                    <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 max-w-md mx-auto px-4">
+                      {searchTerm 
+                        ? 'Try adjusting your search terms or create a new link above.'
+                        : 'Create your first short link above to start tracking and analyzing your URLs.'
+                      }
+                    </p>
+                    {!searchTerm && (
+                      <Button 
+                        onClick={() => document.getElementById('url-input')?.focus()}
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-sm sm:text-base"
+                      >
+                        <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                        Create Your First Link
+                      </Button>
                     )}
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredAndSortedLinks.map((link) => (
+                      <div key={link.id} className="group">
+                        <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-r from-white to-gray-50/50">
+                          <CardContent className="p-4 sm:p-6">
+                            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+                              {/* Link Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start space-x-3 sm:space-x-4">
+                                  <div className="flex-shrink-0">
+                                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                      <Link2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3 mb-2">
+                                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                                        {getShortUrl(link.slug)}
+                                      </h3>
+                                      <span className="inline-flex items-center px-2 py-0.5 sm:px-2.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
+                                        {link.slug}
+                                      </span>
+                                    </div>
+                                    
+                                    <p className="text-sm text-gray-600 truncate max-w-md mb-3 sm:mb-0">
+                                      {link.original_url}
+                                    </p>
+                                    
+                                    <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+                                      {/* Enhanced Click Count Display */}
+                                      <div className="flex items-center space-x-2">
+                                        <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${
+                                          link.click_count === 0 
+                                            ? 'bg-gray-100 text-gray-500' 
+                                            : link.click_count < 10 
+                                            ? 'bg-green-100 text-green-700' 
+                                            : link.click_count < 50 
+                                            ? 'bg-blue-100 text-blue-700' 
+                                            : link.click_count < 100 
+                                            ? 'bg-purple-100 text-purple-700' 
+                                            : 'bg-orange-100 text-orange-700'
+                                        }`}>
+                                          <Eye className="h-3 w-3 inline mr-1" />
+                                          {link.click_count} {link.click_count === 1 ? 'click' : 'clicks'}
+                                        </div>
+                                        {link.click_count > 0 && (
+                                          <div className="text-xs text-gray-400">
+                                            {link.click_count < 10 ? '🆕' : 
+                                             link.click_count < 50 ? '🔥' : 
+                                             link.click_count < 100 ? '⚡' : '🚀'}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center space-x-1 text-xs sm:text-sm text-gray-500">
+                                        <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                                        <span>{formatDate(link.created_at)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex items-center justify-center space-x-2 sm:ml-6">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(getShortUrl(link.slug))}
+                                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                                  title="Copy link"
+                                >
+                                  <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                                
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(link.original_url, '_blank')}
+                                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-green-50 hover:border-green-300 transition-colors"
+                                  title="Visit original URL"
+                                >
+                                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                                
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedAnalytics)
+                                    if (newExpanded.has(link.id)) {
+                                      newExpanded.delete(link.id)
+                                    } else {
+                                      newExpanded.add(link.id)
+                                    }
+                                    setExpandedAnalytics(newExpanded)
+                                  }}
+                                  className={`h-8 w-8 sm:h-9 sm:w-9 p-0 transition-colors ${
+                                    expandedAnalytics.has(link.id)
+                                      ? 'bg-purple-50 border-purple-300 text-purple-600'
+                                      : 'hover:bg-purple-50 hover:border-purple-300'
+                                  }`}
+                                  title={expandedAnalytics.has(link.id) ? "Hide analytics" : "Show analytics"}
+                                >
+                                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                                
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deleteShortLink(link.id, link.slug)}
+                                  disabled={deletingLinkId === link.id}
+                                  className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors"
+                                  title="Delete link"
+                                >
+                                  {deletingLinkId === link.id ? (
+                                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-red-600"></div>
+                                  ) : (
+                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  )}
+                                </Button>
+                                
+                                {/* Debug button - only in development */}
+                                {import.meta.env.DEV && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => testDeletion(link.id, link.slug)}
+                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600 transition-colors"
+                                    title="Test deletion (dev only)"
+                                  >
+                                    🧪
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        {/* Analytics Section */}
+                        {expandedAnalytics.has(link.id) && (
+                          <div className="mt-4 ml-6">
+                            <ReferrerAnalytics shortLinkId={link.id} slug={link.slug} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               // Deleted Links Tab
               <>
