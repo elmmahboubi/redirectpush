@@ -362,72 +362,110 @@ export default function HomePage() {
     setDeletingLinkId(linkId)
     
     try {
-      console.log(`Attempting to delete link: ${slug} (ID: ${linkId})`)
+      console.log(`🗑️ Attempting to soft delete link: ${slug} (ID: ${linkId})`)
       
-      // First, verify the link exists
+      // Step 1: Verify the link exists and is not already deleted
       const { data: existingLink, error: fetchError } = await supabase
         .from('short_links')
-        .select('id, slug, original_url')
+        .select('id, slug, original_url, deleted, deleted_at')
         .eq('id', linkId)
         .single()
 
       if (fetchError) {
-        console.error('Error fetching link before deletion:', fetchError)
-        throw new Error('Link not found')
+        console.error('❌ Error fetching link before deletion:', fetchError)
+        throw new Error(`Link not found: ${fetchError.message}`)
       }
 
       if (!existingLink) {
-        throw new Error('Link not found')
+        throw new Error('Link not found in database')
       }
 
-      console.log('Link found, proceeding with deletion:', existingLink)
+      if (existingLink.deleted) {
+        console.log('⚠️ Link is already deleted:', existingLink)
+        toast.warning('Link is already in the deleted links tab')
+        return
+      }
 
-      // Mark the short link as deleted instead of actually deleting it
-      const { error: deleteError, count } = await supabase
+      console.log('✅ Link found and verified for deletion:', {
+        id: existingLink.id,
+        slug: existingLink.slug,
+        deleted: existingLink.deleted
+      })
+
+      // Step 2: Perform soft delete with comprehensive error handling
+      const { data: updateData, error: updateError, count } = await supabase
         .from('short_links')
         .update({ 
           deleted: true, 
           deleted_at: new Date().toISOString() 
         })
         .eq('id', linkId)
+        .eq('deleted', false) // Only update if not already deleted
+        .select('id, deleted, deleted_at')
 
-      if (deleteError) {
-        console.error('Supabase delete error:', deleteError)
-        throw deleteError
+      if (updateError) {
+        console.error('❌ Supabase update error:', updateError)
+        
+        // Check if it's an RLS policy issue
+        if (updateError.code === '42501') {
+          throw new Error('Permission denied. Please check database policies.')
+        } else if (updateError.code === '23505') {
+          throw new Error('Link already exists with this slug.')
+        } else {
+          throw new Error(`Database error: ${updateError.message}`)
+        }
       }
 
-      console.log(`Soft delete operation completed. Rows affected: ${count}`)
+      if (!updateData || updateData.length === 0) {
+        console.warn('⚠️ No rows were updated. Link might already be deleted.')
+        throw new Error('Link was not updated. It might already be deleted.')
+      }
 
-      // Verify soft deletion
+      console.log(`✅ Soft delete operation completed successfully. Rows affected: ${count}`)
+      console.log('📊 Updated link data:', updateData[0])
+
+      // Step 3: Verify the soft deletion was successful
       const { data: verifyData, error: verifyError } = await supabase
         .from('short_links')
-        .select('id, deleted')
+        .select('id, deleted, deleted_at')
         .eq('id', linkId)
         .single()
 
-      if (!verifyData?.deleted) {
-        console.warn('Link was not marked as deleted:', verifyData)
-        throw new Error('Link was not deleted successfully')
+      if (verifyError) {
+        console.error('❌ Error verifying deletion:', verifyError)
+        throw new Error('Could not verify deletion status')
       }
 
-      console.log('✅ Link soft deletion verified successfully')
+      if (!verifyData?.deleted) {
+        console.warn('⚠️ Link was not marked as deleted:', verifyData)
+        throw new Error('Link was not properly marked as deleted')
+      }
 
-      toast.success('Link moved to deleted links!')
+      console.log('✅ Link soft deletion verified successfully:', verifyData)
+
+      // Step 4: Update UI immediately for better UX
+      toast.success(`Link "${slug}" moved to deleted links!`)
       
-      // Remove from active links state immediately for better UX
+      // Remove from active links state immediately
       setShortLinks(prevLinks => prevLinks.filter(link => link.id !== linkId))
       
-      // Refresh both links and stats to ensure consistency
-      await Promise.all([fetchShortLinks(), fetchClickStats()])
-      
-      // Also refresh deleted links if we're on that tab
-      if (activeTab === 'deleted') {
-        console.log('🔄 Refreshing deleted links tab...')
-        await fetchDeletedLinks()
-      }
+      // Refresh data to ensure consistency
+      await Promise.all([
+        fetchShortLinks(),
+        fetchClickStats(),
+        activeTab === 'deleted' ? fetchDeletedLinks() : Promise.resolve()
+      ])
+
+      console.log('🔄 UI updated and data refreshed successfully')
+
     } catch (error) {
-      console.error('Error deleting link:', error)
-      toast.error(`Failed to delete link: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('❌ Error deleting link:', error)
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Unknown error occurred during deletion'
+      
+      toast.error(`Failed to delete link: ${errorMessage}`)
     } finally {
       setDeletingLinkId(null)
     }
