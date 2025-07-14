@@ -894,8 +894,8 @@ export default function HomePage() {
                 onClick={() => setActiveTab('active')}
                 className={`flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm ${
                   activeTab === 'active' 
-                    ? 'bg-white shadow-sm' 
-                    : 'hover:bg-gray-50'
+                    ? 'bg-white shadow-sm text-gray-900' 
+                    : 'hover:bg-gray-50 text-gray-700'
                 }`}
               >
                 <Link2 className="h-3 sm:h-4 w-3 sm:w-4" />
@@ -912,8 +912,8 @@ export default function HomePage() {
                 onClick={() => setActiveTab('deleted')}
                 className={`flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm ${
                   activeTab === 'deleted' 
-                    ? 'bg-white shadow-sm' 
-                    : 'hover:bg-gray-50'
+                    ? 'bg-white shadow-sm text-gray-900' 
+                    : 'hover:bg-gray-50 text-gray-700'
                 }`}
               >
                 <Trash2 className="h-3 sm:h-4 w-3 sm:w-4" />
